@@ -1872,18 +1872,51 @@ String dateFilter = switch (periodo) {
     }
 
     private static List<List<Cliente>> kmeans(List<Cliente> clientes, int k, Map<String, Integer> reglas) {
+        if (clientes.isEmpty()) {
+            List<List<Cliente>> res = new ArrayList<>();
+            for (int i = 0; i < k; i++) res.add(new ArrayList<>());
+            return res;
+        }
+
         if (clientes.size() <= k) {
             List<List<Cliente>> res = new ArrayList<>();
             for (Cliente c : clientes)
                 res.add(new ArrayList<>(Arrays.asList(c)));
+            while (res.size() < k) {
+                res.add(new ArrayList<>());
+            }
             return res;
         }
 
         List<double[]> centroids = new ArrayList<>();
-        Random rand = new Random(42);
-        for (int i = 0; i < k; i++) {
-            Cliente c = clientes.get(rand.nextInt(clientes.size()));
-            centroids.add(new double[] { c.lat, c.lon });
+        // Inicialización K-Means++
+        Cliente c0 = clientes.get(0);
+        centroids.add(new double[] { c0.lat, c0.lon });
+
+        Set<Integer> chosenIndices = new HashSet<>();
+        chosenIndices.add(0);
+
+        for (int i = 1; i < k; i++) {
+            double maxDist = -1;
+            int bestIdx = 0;
+            for (int j = 0; j < clientes.size(); j++) {
+                if (chosenIndices.contains(j)) continue;
+                Cliente c = clientes.get(j);
+                double minDistToCentroids = Double.MAX_VALUE;
+                for (double[] cent : centroids) {
+                    double d = haversine(c.lat, c.lon, cent[0], cent[1]);
+                    if (d < minDistToCentroids) {
+                        minDistToCentroids = d;
+                    }
+                }
+                if (minDistToCentroids > maxDist) {
+                    maxDist = minDistToCentroids;
+                    bestIdx = j;
+                }
+            }
+            chosenIndices.add(bestIdx);
+            Cliente bestC = clientes.get(bestIdx);
+            centroids.add(new double[] { bestC.lat, bestC.lon });
         }
 
         List<List<Cliente>> clusters = new ArrayList<>();
@@ -1903,20 +1936,31 @@ String dateFilter = switch (periodo) {
                 // Intentar asignar al más cercano que cumpla las reglas
                 for (int i = 0; i < k; i++) {
                     double d = haversine(c.lat, c.lon, centroids.get(i)[0], centroids.get(i)[1]);
-                    if (d < bestDist && validarRegla(c, clusters.get(i), reglas)) {
-                        bestDist = d;
-                        bestK = i;
+                    if (validarRegla(c, clusters.get(i), reglas)) {
+                        if (d < bestDist - 0.0001) {
+                            bestDist = d;
+                            bestK = i;
+                        } else if (Math.abs(d - bestDist) <= 0.0001) {
+                            if (bestK == -1 || clusters.get(i).size() < clusters.get(bestK).size()) {
+                                bestDist = d;
+                                bestK = i;
+                            }
+                        }
                     }
                 }
 
-                // Si ninguna cumple, asignar al más cercano por fuerza bruta (o manejar
-                // excepción)
+                // Si ninguna cumple por regla, asignar al más cercano por fuerza bruta
                 if (bestK == -1) {
                     for (int i = 0; i < k; i++) {
                         double d = haversine(c.lat, c.lon, centroids.get(i)[0], centroids.get(i)[1]);
-                        if (d < bestDist) {
+                        if (d < bestDist - 0.0001) {
                             bestDist = d;
                             bestK = i;
+                        } else if (Math.abs(d - bestDist) <= 0.0001) {
+                            if (bestK == -1 || clusters.get(i).size() < clusters.get(bestK).size()) {
+                                bestDist = d;
+                                bestK = i;
+                            }
                         }
                     }
                 }
@@ -1924,6 +1968,38 @@ String dateFilter = switch (periodo) {
                 clusters.get(bestK).add(c);
             }
 
+            // REBALANCING / EMPTY CLUSTER RECOVERY
+            for (int i = 0; i < k; i++) {
+                if (clusters.get(i).isEmpty()) {
+                    int maxClusterIdx = -1;
+                    int maxCount = 0;
+                    for (int j = 0; j < k; j++) {
+                        if (clusters.get(j).size() > maxCount) {
+                            maxCount = clusters.get(j).size();
+                            maxClusterIdx = j;
+                        }
+                    }
+
+                    if (maxClusterIdx != -1 && maxCount > 1) {
+                        List<Cliente> maxCluster = clusters.get(maxClusterIdx);
+                        double[] cent = centroids.get(maxClusterIdx);
+                        int furthestIdxInCluster = 0;
+                        double maxD = -1;
+                        for (int m = 0; m < maxCluster.size(); m++) {
+                            Cliente cm = maxCluster.get(m);
+                            double dist = haversine(cm.lat, cm.lon, cent[0], cent[1]);
+                            if (dist > maxD) {
+                                maxD = dist;
+                                furthestIdxInCluster = m;
+                            }
+                        }
+                        Cliente moved = maxCluster.remove(furthestIdxInCluster);
+                        clusters.get(i).add(moved);
+                    }
+                }
+            }
+
+            // Recalcular centroides
             changed = false;
             for (int i = 0; i < k; i++) {
                 if (clusters.get(i).isEmpty())
