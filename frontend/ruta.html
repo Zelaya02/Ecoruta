@@ -537,32 +537,63 @@
 
         // ========== RENDER MAPA CON LEAFLET ==========
         function renderMap(clientes) {
-            if (!clientes.length) return;
-            const primerPunto = [clientes[0].latitud, clientes[0].longitud];
-            if (mapInstance) mapInstance.remove();
-            mapInstance = L.map('map').setView(primerPunto, 13);
+            if (!clientes || !clientes.length) return;
+            const validos = clientes.filter(c => c.latitud != null && c.longitud != null && !isNaN(c.latitud) && !isNaN(c.longitud) && (c.latitud !== 0 || c.longitud !== 0));
+            if (!validos.length) return;
 
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> & CartoDB',
-                subdomains: 'abcd',
-                maxZoom: 19
-            }).addTo(mapInstance);
+            try {
+                if (mapInstance) {
+                    mapInstance.remove();
+                    mapInstance = null;
+                }
+                const mapContainer = document.getElementById('map');
+                if (mapContainer) mapContainer._leaflet_id = null;
 
-            const puntos = [];
-            clientes.forEach((c, i) => {
-                const latlng = [c.latitud, c.longitud];
-                puntos.push(latlng);
-                const estadoIcon = c.estado === 'entregado' ? '✅' : (c.estado === 'rechazado' ? '❌' : '🕒');
-                const marker = L.marker(latlng).addTo(mapInstance);
-                marker.bindPopup(`
-                    <b>${i + 1}. ${escapeHtml(c.nombre)}</b><br>
-                    <span style="font-size:12px;">Estado: ${estadoIcon} ${c.estado.toUpperCase()}</span>
-                `);
-            });
+                const primerPunto = [validos[0].latitud, validos[0].longitud];
+                mapInstance = L.map('map').setView(primerPunto, 13);
 
-            // Dibujar ruta optimizada
-            const polyline = L.polyline(puntos, { color: '#F5B041', weight: 5, opacity: 0.8 }).addTo(mapInstance);
-            mapInstance.fitBounds(polyline.getBounds());
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    maxZoom: 19
+                }).addTo(mapInstance);
+
+                const puntos = [];
+                validos.forEach((c, i) => {
+                    const latlng = [c.latitud, c.longitud];
+                    puntos.push(latlng);
+                    const est = (c.estado || 'pendiente').toLowerCase();
+                    const estadoIcon = est === 'entregado' ? '✅' : (est === 'rechazado' ? '❌' : '🕒');
+
+                    const pinBg = est === 'entregado' ? '#10B981' : (est === 'rechazado' ? '#EF4444' : '#5B6BFF');
+                    const customIcon = L.divIcon({
+                        className: 'custom-map-pin',
+                        html: `<div style="background:${pinBg}; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; border:2px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3);">${i + 1}</div>`,
+                        iconSize: [28, 28],
+                        iconAnchor: [14, 14]
+                    });
+
+                    const marker = L.marker(latlng, { icon: customIcon }).addTo(mapInstance);
+                    marker.bindPopup(`
+                        <div style="font-family:'Inter',sans-serif; padding:4px;">
+                            <b style="font-size:14px; color:#111827;">${i + 1}. ${escapeHtml(c.nombre)}</b><br>
+                            <span style="font-size:12px; color:#4B5563;">Estado: ${estadoIcon} ${est.toUpperCase()}</span>
+                        </div>
+                    `);
+                });
+
+                if (puntos.length > 1) {
+                    const polyline = L.polyline(puntos, { color: '#5B6BFF', weight: 4, opacity: 0.85, dashArray: '6, 6' }).addTo(mapInstance);
+                    mapInstance.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+                } else if (puntos.length === 1) {
+                    mapInstance.setView(puntos[0], 15);
+                }
+
+                setTimeout(() => {
+                    if (mapInstance) mapInstance.invalidateSize();
+                }, 200);
+            } catch (err) {
+                console.error("Error al renderizar el mapa Leaflet:", err);
+            }
         }
 
         // ========== RENDER LISTA DE CLIENTES ==========
