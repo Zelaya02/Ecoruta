@@ -535,10 +535,34 @@
             }
         }
 
+        function getLat(c) {
+            if (!c) return null;
+            let val = (c.latitud !== undefined && c.latitud !== null) ? c.latitud : c.lat;
+            if (val === null || val === undefined) return null;
+            let n = parseFloat(val);
+            return isNaN(n) ? null : n;
+        }
+
+        function getLng(c) {
+            if (!c) return null;
+            let val = (c.longitud !== undefined && c.longitud !== null) ? c.longitud : (c.lon !== undefined ? c.lon : c.lng);
+            if (val === null || val === undefined) return null;
+            let n = parseFloat(val);
+            return isNaN(n) ? null : n;
+        }
+
         // ========== RENDER MAPA CON LEAFLET ==========
         function renderMap(clientes) {
             if (!clientes || !clientes.length) return;
-            const validos = clientes.filter(c => c.latitud != null && c.longitud != null && !isNaN(c.latitud) && !isNaN(c.longitud) && (c.latitud !== 0 || c.longitud !== 0));
+
+            const validos = clientes.map(c => {
+                return {
+                    ...c,
+                    lat: getLat(c),
+                    lng: getLng(c)
+                };
+            }).filter(c => c.lat !== null && c.lng !== null && (c.lat !== 0 || c.lng !== 0));
+
             if (!validos.length) return;
 
             try {
@@ -549,7 +573,7 @@
                 const mapContainer = document.getElementById('map');
                 if (mapContainer) mapContainer._leaflet_id = null;
 
-                const primerPunto = [validos[0].latitud, validos[0].longitud];
+                const primerPunto = [validos[0].lat, validos[0].lng];
                 mapInstance = L.map('map').setView(primerPunto, 13);
 
                 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -559,7 +583,7 @@
 
                 const puntos = [];
                 validos.forEach((c, i) => {
-                    const latlng = [c.latitud, c.longitud];
+                    const latlng = [c.lat, c.lng];
                     puntos.push(latlng);
                     const est = (c.estado || 'pendiente').toLowerCase();
                     const estadoIcon = est === 'entregado' ? '✅' : (est === 'rechazado' ? '❌' : '🕒');
