@@ -853,9 +853,6 @@
                     <label style="font-size:12px; font-weight:600;"><i class="fas fa-star" style="color:var(--accent-gold);"></i> Prioridad de Ruteo</label>
                     <select id="prioridadTipo" class="control-input" style="width:100%;">
                         <option value="ninguna">Ninguna - Ruta más óptima</option>
-                        <option value="supermercado">Supermercados primero</option>
-                        <option value="mayorista / distribuidor">Mayoristas primero</option>
-                        <option value="minorista/gastronómico">Minoristas primero</option>
                     </select>
                 </div>
                 <div>
@@ -867,8 +864,9 @@
                         </label>
                     </div>
                 </div>
-                <div style="display:flex; align-items:flex-end; gap:10px;">
-                    <button class="btn-secondary-outline" onclick="abrirModalTransportes()" style="width:100%;"><i class="fas fa-truck"></i> Transportes (Choferes/Vehículos)</button>
+                <div style="display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;">
+                    <button class="btn-secondary-outline" onclick="abrirModalCategorias()" style="flex:1;"><i class="fas fa-tags"></i> Categorías</button>
+                    <button class="btn-secondary-outline" onclick="abrirModalTransportes()" style="flex:1;"><i class="fas fa-truck"></i> Transportes (Choferes/Vehículos)</button>
                 </div>
             </div>
         </div>
@@ -882,9 +880,6 @@
             <div class="filters-group">
                 <select id="filtroCategoria" class="select-filter" onchange="aplicarFiltros()">
                     <option value="todas">Todas las categorías</option>
-                    <option value="supermercado">Supermercados</option>
-                    <option value="mayorista / distribuidor">Mayoristas</option>
-                    <option value="minorista/gastronómico">Minoristas</option>
                 </select>
                 
                 <select id="ordenClientes" class="select-filter" onchange="aplicarFiltros()">
@@ -995,9 +990,6 @@
                 <div style="margin-bottom:18px;">
                     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px; color:var(--text-muted-light); text-transform:uppercase; letter-spacing:0.3px;">Tipo de Cliente</label>
                     <select id="clienteTipo" class="control-input" style="width:100%; box-sizing:border-box;">
-                        <option value="minorista/gastronómico">Minorista / Gastronómico</option>
-                        <option value="supermercado">Supermercado</option>
-                        <option value="mayorista / distribuidor">Mayorista / Distribuidor</option>
                     </select>
                 </div>
                 <div style="margin-bottom:18px;">
@@ -1017,6 +1009,34 @@
                     <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Guardar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE GESTION DE CATEGORIAS -->
+    <div id="modalCategorias" class="modal-overlay">
+        <div class="modal-container" style="max-width:700px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2><i class="fas fa-tags" style="color:var(--primary-main);"></i> Gestión de Categorías</h2>
+                <button class="btn-icon" onclick="cerrarModalCategorias()"><i class="fas fa-times"></i></button>
+            </div>
+
+            <form id="formCategoria" onsubmit="guardarCategoria(event)" style="display:flex; gap:10px; align-items:flex-end; margin-bottom:20px; background:rgba(0,0,0,0.02); padding:15px; border-radius:15px;">
+                <input type="hidden" id="categoriaId">
+                <div style="flex:1;">
+                    <label style="font-size:12px; font-weight:600;">Nombre de la categoría</label>
+                    <input type="text" id="categoriaNombre" class="control-input" placeholder="Ej: Supermercado" required>
+                </div>
+                <button type="submit" class="btn-primary" style="padding:12px 20px;"><i class="fas fa-save"></i> Guardar</button>
+                <button type="button" class="btn-secondary-outline" onclick="resetFormCategoria()" style="padding:12px;" title="Limpiar"><i class="fas fa-eraser"></i></button>
+            </form>
+
+            <div class="table-wrapper" style="max-height:320px;">
+                <table class="client-table">
+                    <thead><tr><th>Categoría</th><th>Clientes Agrupados</th><th style="width:110px;">Acciones</th></tr></thead>
+                    <tbody id="tbodyCategorias"><tr><td colspan="3">Cargando...</td></tr></tbody>
+                </table>
+            </div>
+            <p style="font-size:12px; color:var(--text-muted-light); margin-top:12px;"><i class="fas fa-info-circle"></i> Solo se pueden eliminar categorías que no tengan clientes asignados.</p>
         </div>
     </div>
 
@@ -1173,9 +1193,6 @@
                     <label style="font-size:12px; font-weight:600;">Prioridad</label>
                     <select id="rutaPrioridad" class="control-input">
                         <option value="ninguna">Sin prioridad</option>
-                        <option value="supermercado">Supermercados primero</option>
-                        <option value="mayorista / distribuidor">Mayoristas primero</option>
-                        <option value="minorista/gastronómico">Minoristas primero</option>
                     </select>
                 </div>
 
@@ -1295,6 +1312,7 @@
         let clientesFiltrados = [];
         let gruposAbiertos = new Set();
         let kmzPlacemarks = [];
+        let categorias = [];
 
         async function fetchWithAuth(url, options = {}) {
             const token = localStorage.getItem('nexo_token');
@@ -1642,7 +1660,8 @@
         const savedUrl = localStorage.getItem('puntoInicioUrl') || '';
         document.getElementById('puntoInicio').value = savedUrl;
         const savedPrioridad = localStorage.getItem('prioridadTipo') || 'ninguna';
-        document.getElementById('prioridadTipo').value = savedPrioridad;
+        const selPrioridad = document.getElementById('prioridadTipo');
+        if (selPrioridad && [...selPrioridad.options].some(o => o.value === savedPrioridad)) selPrioridad.value = savedPrioridad;
     }
 }
         function toggleDarkMode(isDark) {
@@ -1678,9 +1697,9 @@
         }
         syncThemeUI(isDarkModeActive);
 
-        function abrirModalCliente() { document.getElementById('modalTitulo').innerHTML = '<i class="fas fa-user-plus"></i> Añadir Cliente'; document.getElementById('clienteId').value = ''; document.getElementById('formCliente').reset(); popularSelectCadena('NINGUNO'); document.getElementById('modalCliente').style.display = 'flex'; }
+        function abrirModalCliente() { document.getElementById('modalTitulo').innerHTML = '<i class="fas fa-user-plus"></i> Añadir Cliente'; document.getElementById('clienteId').value = ''; document.getElementById('formCliente').reset(); popularSelectCadena('NINGUNO'); seleccionarTipoCliente(categorias.length ? categorias[0].nombre : ''); document.getElementById('modalCliente').style.display = 'flex'; }
         function cerrarModalCliente() { document.getElementById('modalCliente').style.display = 'none'; }
-        function editarCliente(id) { let c = clientes.find(c => c.id === id); if (!c) return; document.getElementById('modalTitulo').innerHTML = '<i class="fas fa-edit"></i> Editar Cliente'; document.getElementById('clienteId').value = c.id; document.getElementById('clienteNombre').value = c.nombre; document.getElementById('clienteTipo').value = c.tipo_cliente || 'minorista/gastronómico'; popularSelectCadena(c.cadena); document.getElementById('modalCliente').style.display = 'flex'; }
+        function editarCliente(id) { let c = clientes.find(c => c.id === id); if (!c) return; document.getElementById('modalTitulo').innerHTML = '<i class="fas fa-edit"></i> Editar Cliente'; document.getElementById('clienteId').value = c.id; document.getElementById('clienteNombre').value = c.nombre; seleccionarTipoCliente(c.tipo_cliente || 'minorista/gastronómico'); popularSelectCadena(c.cadena); document.getElementById('modalCliente').style.display = 'flex'; }
         
         function extraerCoordenadas(url) {
             if (!url) return null;
@@ -1847,7 +1866,7 @@
                             nombre: p.nombre, 
                             latitud: p.lat, 
                             longitud: p.lon, 
-                            tipo_cliente: 'minorista/gastronómico' 
+                            tipo_cliente: categorias.length ? categorias[0].nombre : 'minorista/gastronómico' 
                         }) 
                     });
                     importados++;
@@ -1977,6 +1996,156 @@
                 await fetchWithAuth(`/api/vehiculos?id=${id}`, { method: 'DELETE' }); 
                 cargarTransportes(); 
             } 
+        }
+
+        // ================= GESTION DE CATEGORIAS =================
+        async function cargarCategorias() {
+            try {
+                const res = await fetchWithAuth('/api/categorias');
+                if (!res.ok) throw new Error();
+                categorias = await res.json();
+                popularSelectsCategorias();
+                renderTablaCategorias();
+            } catch (e) {
+                console.error('Error al cargar categorías', e);
+            }
+        }
+
+        function popularSelectsCategorias() {
+            const filtro = document.getElementById('filtroCategoria');
+            if (filtro) {
+                const prev = filtro.value;
+                filtro.innerHTML = '<option value="todas">Todas las categorías</option>';
+                categorias.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat.nombre;
+                    opt.textContent = cat.nombre;
+                    filtro.appendChild(opt);
+                });
+                if ([...filtro.options].some(o => o.value === prev)) filtro.value = prev;
+            }
+
+            const tipo = document.getElementById('clienteTipo');
+            if (tipo) {
+                const prev = tipo.value;
+                tipo.innerHTML = '';
+                categorias.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat.nombre;
+                    opt.textContent = cat.nombre;
+                    tipo.appendChild(opt);
+                });
+                if ([...tipo.options].some(o => o.value === prev)) tipo.value = prev;
+            }
+
+            ['prioridadTipo', 'rutaPrioridad'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                const prev = sel.value;
+                const etiquetaNinguna = id === 'rutaPrioridad' ? 'Sin prioridad' : 'Ninguna - Ruta más óptima';
+                sel.innerHTML = `<option value="ninguna">${etiquetaNinguna}</option>`;
+                categorias.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat.nombre;
+                    opt.textContent = `Clientes "${cat.nombre}" primero`;
+                    sel.appendChild(opt);
+                });
+                if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+            });
+        }
+
+        function renderTablaCategorias() {
+            const tb = document.getElementById('tbodyCategorias');
+            if (!tb) return;
+            if (categorias.length === 0) tb.innerHTML = '<tr><td colspan="3">No hay categorías.</td></tr>';
+            else tb.innerHTML = categorias.map(c => `
+                <tr>
+                    <td><strong>${escapeHtml(c.nombre)}</strong></td>
+                    <td><span class="badge-tag">${c.clientes || 0} clientes</span></td>
+                    <td>
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <button class="btn-icon" onclick="editarCategoria(${c.id})" title="Editar"><i class="fas fa-edit"></i></button>
+                            <button class="btn-icon" onclick="eliminarCategoria(${c.id})" style="color:var(--danger);" title="Eliminar"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>`).join('');
+        }
+
+        function abrirModalCategorias() {
+            document.getElementById('modalCategorias').style.display = 'flex';
+            resetFormCategoria();
+            renderTablaCategorias();
+        }
+        function cerrarModalCategorias() { document.getElementById('modalCategorias').style.display = 'none'; }
+        function resetFormCategoria() {
+            document.getElementById('formCategoria').reset();
+            document.getElementById('categoriaId').value = '';
+        }
+        function editarCategoria(id) {
+            const cat = categorias.find(c => c.id === id);
+            if (!cat) return;
+            document.getElementById('categoriaId').value = cat.id;
+            document.getElementById('categoriaNombre').value = cat.nombre;
+            document.getElementById('categoriaNombre').focus();
+        }
+
+        async function guardarCategoria(e) {
+            e.preventDefault();
+            const id = document.getElementById('categoriaId').value;
+            const nombre = document.getElementById('categoriaNombre').value.trim();
+            if (!nombre) { alert('Ingresá un nombre para la categoría'); return; }
+            const method = id ? 'PUT' : 'POST';
+            const payload = { nombre };
+            if (id) payload.id = parseInt(id);
+            try {
+                const res = await fetchWithAuth('/api/categorias', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.message || err.error || 'Error al guardar la categoría');
+                    return;
+                }
+                resetFormCategoria();
+                await cargarCategorias();
+                cargarClientes();
+            } catch (err) {
+                alert('Error al guardar la categoría');
+            }
+        }
+
+        async function eliminarCategoria(id) {
+            const cat = categorias.find(c => c.id === id);
+            if (!cat) return;
+            if (!confirm(`¿Eliminar la categoría "${cat.nombre}"?`)) return;
+            try {
+                const res = await fetchWithAuth(`/api/categorias?id=${id}`, { method: 'DELETE' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    if (data.error === 'categoria_en_uso') {
+                        alert(`⚠️ No se puede eliminar: hay ${data.cliente_count || 0} cliente(s) con la categoría "${cat.nombre}" asignada.`);
+                    } else {
+                        alert(data.message || data.error || 'Error al eliminar la categoría');
+                    }
+                    return;
+                }
+                await cargarCategorias();
+                cargarClientes();
+            } catch (err) {
+                alert('Error al eliminar la categoría');
+            }
+        }
+
+        function seleccionarTipoCliente(valor) {
+            const sel = document.getElementById('clienteTipo');
+            if (!sel) return;
+            if ([...sel.options].some(o => o.value === valor)) {
+                sel.value = valor;
+            } else {
+                const opt = document.createElement('option');
+                opt.value = valor || '';
+                opt.textContent = valor || '';
+                opt.selected = true;
+                sel.appendChild(opt);
+            }
         }
 
         // ================= GESTION DE RUTAS (EDICION Y FINALIZACION) =================
@@ -2139,6 +2308,7 @@ document.getElementById('modalRutas').style.display = 'flex';
                 if (btnAdmin) btnAdmin.style.display = 'inline-flex';
             }
             cargarClientes();
+            cargarCategorias();
             cargarRutas();
         });
     </script>

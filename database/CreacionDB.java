@@ -1,6 +1,7 @@
 import java.sql.*;
 import java.nio.file.*;
 import java.util.List;
+import java.util.ArrayList;
 
 public class CreacionDB {
     public static void main(String[] args) {
@@ -33,11 +34,18 @@ public class CreacionDB {
             try (Connection conn = DriverManager.getConnection(dbUrl, user, pass);
                  Statement dbStmt = conn.createStatement()) {
                 
-        System.out.println("Creando tablas...");
-                dbStmt.executeUpdate("CREATE TABLE usuarios (id SERIAL PRIMARY KEY, username TEXT UNIQUE, password TEXT, nombre TEXT, rol TEXT)");
+                // --- Esquema completo (schema.sql) ---
+                System.out.println("Aplicando esquema (schema.sql)...");
+                Path schemaPath = Paths.get("schema.sql");
+                if (Files.exists(schemaPath)) {
+                    String schema = Files.readString(schemaPath);
+                    ejecutarScript(dbStmt, schema);
+                    System.out.println("✅ Esquema aplicado.");
+                } else {
+                    System.out.println("⚠️  No se encontro schema.sql. Se omite la creacion de tablas.");
+                }
 
-                dbStmt.executeUpdate("INSERT INTO usuarios (username, password, nombre, rol) VALUES ('admin', 'nexo2025', 'Administrador', 'admin')");
-                
+                // --- Clientes por defecto ---
                 Path sqlPath = Paths.get("import.sql");
                 if (Files.exists(sqlPath)) {
                     System.out.println("Cargando clientes...");
@@ -45,8 +53,12 @@ public class CreacionDB {
                     int count = 0;
                     for (String line : lines) {
                         if (!line.trim().isEmpty() && !line.startsWith("--") && !line.contains("TRUNCATE")) {
-                            dbStmt.executeUpdate(line);
-                            count++;
+                            try {
+                                dbStmt.executeUpdate(line);
+                                count++;
+                            } catch (SQLException e) {
+                                System.err.println("   (omitido) " + e.getMessage());
+                            }
                         }
                     }
                     System.out.println("✅ " + count + " clientes cargados.");
@@ -68,6 +80,35 @@ public class CreacionDB {
             }
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
+        }
+    }
+
+    /** Ejecuta un script SQL separandolo por ';' (evita depender de multi-queries). */
+    private static void ejecutarScript(Statement stmt, String script) throws SQLException {
+        List<String> sentencias = new ArrayList<>();
+        StringBuilder actual = new StringBuilder();
+        for (String linea : script.split("\n")) {
+            String limpia = linea.trim();
+            if (limpia.startsWith("--") || limpia.isEmpty()) {
+                continue;
+            }
+            actual.append(linea).append("\n");
+            if (limpia.endsWith(";")) {
+                sentencias.add(actual.toString());
+                actual.setLength(0);
+            }
+        }
+        if (actual.toString().trim().length() > 0) {
+            sentencias.add(actual.toString());
+        }
+        for (String sql : sentencias) {
+            String s = sql.trim();
+            if (s.length() == 0) continue;
+            try {
+                stmt.executeUpdate(s);
+            } catch (SQLException e) {
+                System.err.println("   (omitido) " + e.getMessage());
+            }
         }
     }
 }

@@ -27,6 +27,28 @@ if not exist "src\main\java\com\ruteo\Main.java" (
 echo ✅ Main.java encontrado
 echo.
 
+REM ------ Auto-detectar JDK instalado (fallback a PATH del sistema) ------
+set "JAVA_HOME="
+if exist "C:\Program Files\Eclipse Adoptium" (
+    for /d %%d in ("C:\Program Files\Eclipse Adoptium\jdk-*") do (
+        if exist "%%d\bin\javac.exe" set "JAVA_HOME=%%d"
+    )
+)
+if not defined JAVA_HOME (
+    if exist "%ProgramFiles%\Java" (
+        for /d %%d in ("%ProgramFiles%\Java\jdk-*") do (
+            if exist "%%d\bin\javac.exe" set "JAVA_HOME=%%d"
+        )
+    )
+)
+if defined JAVA_HOME (
+    set "PATH=%JAVA_HOME%\bin;%PATH%"
+    echo ✅ JDK detectado: %JAVA_HOME%
+) else (
+    echo ⚠️  No se encontro un JDK instalado. Se usara javac/java del PATH.
+)
+echo.
+
 REM Configurar variables de entorno (cambiar segun sea necesario)
 if "%DB_PASSWORD%"=="" (
     echo ⚠️  Variable DB_PASSWORD no definida. Configure sus credenciales:

@@ -29,7 +29,7 @@ public class Main {
     private static final Gson gson = new Gson();
     private static String DB_URL = "jdbc:postgresql://localhost:5000/ruteo_db"; // se auto-detecta al inicio
     private static String DB_USER = getEnvOrDefault("DB_USER", "postgres");
-    private static String DB_PASSWORD = getEnvOrDefault("DB_PASSWORD", "Zelaya1103");
+    private static String DB_PASSWORD = getEnvOrDefault("DB_PASSWORD", "Zelaya11");
     private static final String ORS_KEY = getEnvOrDefault("ORS_API_KEY", "");
     private static final String FRONTEND_DIR = getEnvOrDefault("FRONTEND_DIR", "../frontend");
 
@@ -151,6 +151,14 @@ public class Main {
                     "limite_por_movil INTEGER, " +
                     "activo BOOLEAN DEFAULT true)");
 
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS categorias (" +
+                    "id SERIAL PRIMARY KEY, " +
+                    "nombre TEXT, " +
+                    "activo BOOLEAN DEFAULT true, " +
+                    "usuario_id INTEGER DEFAULT 1)");
+            try { stmt.executeUpdate("ALTER TABLE categorias DROP CONSTRAINT IF EXISTS categorias_nombre_key"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("CREATE UNIQUE INDEX IF NOT EXISTS uq_categorias_nombre_usuario ON categorias (LOWER(nombre), usuario_id)"); } catch (SQLException ignored) {}
+
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS choferes (" +
                     "id SERIAL PRIMARY KEY, " +
                     "nombre TEXT, " +
@@ -202,8 +210,21 @@ public class Main {
             try { stmt.executeUpdate("ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS usuario_id INTEGER DEFAULT 1"); } catch (SQLException ignored) {}
             try { stmt.executeUpdate("ALTER TABLE rutas_generadas ADD COLUMN IF NOT EXISTS usuario_id INTEGER DEFAULT 1"); } catch (SQLException ignored) {}
             try { stmt.executeUpdate("ALTER TABLE reglas_ruteo ADD COLUMN IF NOT EXISTS usuario_id INTEGER DEFAULT 1"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS usuario_id INTEGER DEFAULT 1"); } catch (SQLException ignored) {}
 
-            System.out.println("✅ Esquema de base de datos verificado/creado.");
+            // Claves foráneas (Foreign Keys)
+            try { stmt.executeUpdate("ALTER TABLE clientes ADD CONSTRAINT fk_clientes_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE choferes ADD CONSTRAINT fk_choferes_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE vehiculos ADD CONSTRAINT fk_vehiculos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE reglas_ruteo ADD CONSTRAINT fk_reglas_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE categorias ADD CONSTRAINT fk_categorias_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE rutas_generadas ADD CONSTRAINT fk_rutas_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE rutas_generadas ADD CONSTRAINT fk_rutas_chofer FOREIGN KEY (chofer_id) REFERENCES choferes(id) ON DELETE SET NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE rutas_generadas ADD CONSTRAINT fk_rutas_vehiculo FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE SET NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE entregas ADD CONSTRAINT fk_entregas_ruta FOREIGN KEY (ruta_token) REFERENCES rutas_generadas(token) ON DELETE CASCADE"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE entregas ADD CONSTRAINT fk_entregas_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE"); } catch (SQLException ignored) {}
+
+            System.out.println("✅ Esquema de base de datos verificado/creado con relaciones.");
             
             ResultSet rsClientes = stmt.executeQuery("SELECT COUNT(*) FROM clientes");
             if (rsClientes.next() && rsClientes.getInt(1) == 0) {
@@ -309,6 +330,7 @@ public class Main {
         server.createContext("/api/reglas", new ReglasHandler());
         server.createContext("/api/choferes", new ChoferesHandler());
         server.createContext("/api/vehiculos", new VehiculosHandler());
+        server.createContext("/api/categorias", new CategoriasHandler());
         server.createContext("/api/kml/importar", new KmlImportHandler());
         server.createContext("/api/kml/exportar", new KmlExportHandler());
         server.createContext("/api/admin/usuarios", new AdminUsuariosHandler());
@@ -1101,6 +1123,202 @@ public class Main {
 
     }
 
+    static class CategoriasHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            setCORS(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if (!isAuthorized(exchange)) {
+                sendError(exchange, 401, "No autorizado");
+                return;
+            }
+            Integer userId = getUserIdFromSession(exchange);
+            if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
+
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                asegurarCategoriasDefault(conn, userId);
+
+                if ("GET".equals(exchange.getRequestMethod())) {
+                    List<Map<String, Object>> categorias = new ArrayList<>();
+                    PreparedStatement stmt = conn.prepareStatement("SELECT id, nombre FROM categorias WHERE activo = true AND usuario_id = ? ORDER BY nombre");
+                    stmt.setInt(1, userId);
+                    ResultSet rs = stmt.executeQuery();
+
+                    Map<String, Integer> usos = new HashMap<>();
+                    PreparedStatement usosStmt = conn.prepareStatement("SELECT LOWER(tipo_cliente) AS tc, COUNT(*) FROM clientes WHERE activo = true AND usuario_id = ? AND tipo_cliente IS NOT NULL AND tipo_cliente <> '' GROUP BY LOWER(tipo_cliente)");
+                    usosStmt.setInt(1, userId);
+                    ResultSet rsUsos = usosStmt.executeQuery();
+                    while (rsUsos.next()) {
+                        usos.put(rsUsos.getString("tc"), rsUsos.getInt("count"));
+                    }
+                    usosStmt.close();
+
+                    while (rs.next()) {
+                        Map<String, Object> cat = new HashMap<>();
+                        cat.put("id", rs.getInt("id"));
+                        cat.put("nombre", rs.getString("nombre"));
+                        String clave = rs.getString("nombre").toLowerCase();
+                        cat.put("clientes", usos.getOrDefault(clave, 0));
+                        categorias.add(cat);
+                    }
+                    stmt.close();
+                    sendResponse(exchange, 200, gson.toJson(categorias));
+                } else if ("POST".equals(exchange.getRequestMethod())) {
+                    String body = new BufferedReader(
+                            new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
+                            .lines().collect(Collectors.joining("\n"));
+                    Map<String, Object> req = gson.fromJson(body, Map.class);
+                    String nombre = req.get("nombre") == null ? "" : ((String) req.get("nombre")).trim();
+                    if (nombre.isEmpty()) {
+                        sendError(exchange, 400, "El nombre de la categoría es obligatorio");
+                        return;
+                    }
+                    PreparedStatement check = conn.prepareStatement("SELECT id FROM categorias WHERE LOWER(nombre) = LOWER(?) AND usuario_id = ?");
+                    check.setString(1, nombre);
+                    check.setInt(2, userId);
+                    ResultSet rsCheck = check.executeQuery();
+                    if (rsCheck.next()) {
+                        check.close();
+                        sendError(exchange, 409, "Ya existe una categoría con ese nombre");
+                        return;
+                    }
+                    check.close();
+                    PreparedStatement ins = conn.prepareStatement("INSERT INTO categorias (nombre, activo, usuario_id) VALUES (?, true, ?)", Statement.RETURN_GENERATED_KEYS);
+                    ins.setString(1, nombre);
+                    ins.setInt(2, userId);
+                    ins.executeUpdate();
+                    ResultSet keyRs = ins.getGeneratedKeys();
+                    int newId = keyRs.next() ? keyRs.getInt(1) : 0;
+                    ins.close();
+
+                    Map<String, Object> r = new HashMap<>();
+                    r.put("id", newId);
+                    r.put("nombre", nombre);
+                    r.put("clientes", 0);
+                    sendResponse(exchange, 201, gson.toJson(r));
+                } else if ("PUT".equals(exchange.getRequestMethod())) {
+                    String body = new BufferedReader(
+                            new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
+                            .lines().collect(Collectors.joining("\n"));
+                    Map<String, Object> req = gson.fromJson(body, Map.class);
+                    int id = ((Double) req.get("id")).intValue();
+                    String nombre = req.get("nombre") == null ? "" : ((String) req.get("nombre")).trim();
+                    if (nombre.isEmpty()) {
+                        sendError(exchange, 400, "El nombre de la categoría es obligatorio");
+                        return;
+                    }
+                    PreparedStatement find = conn.prepareStatement("SELECT nombre FROM categorias WHERE id = ? AND usuario_id = ?");
+                    find.setInt(1, id);
+                    find.setInt(2, userId);
+                    ResultSet rsFind = find.executeQuery();
+                    if (!rsFind.next()) {
+                        find.close();
+                        sendError(exchange, 404, "Categoría no encontrada");
+                        return;
+                    }
+                    String nombreAnterior = rsFind.getString("nombre");
+                    find.close();
+
+                    if (!nombreAnterior.equalsIgnoreCase(nombre)) {
+                        PreparedStatement check = conn.prepareStatement("SELECT id FROM categorias WHERE LOWER(nombre) = LOWER(?) AND id <> ? AND usuario_id = ?");
+                        check.setString(1, nombre);
+                        check.setInt(2, id);
+                        check.setInt(3, userId);
+                        ResultSet rsCheck = check.executeQuery();
+                        if (rsCheck.next()) {
+                            check.close();
+                            sendError(exchange, 409, "Ya existe una categoría con ese nombre");
+                            return;
+                        }
+                        check.close();
+
+                        PreparedStatement updCat = conn.prepareStatement("UPDATE categorias SET nombre = ? WHERE id = ? AND usuario_id = ?");
+                        updCat.setString(1, nombre);
+                        updCat.setInt(2, id);
+                        updCat.setInt(3, userId);
+                        updCat.executeUpdate();
+                        updCat.close();
+
+                        PreparedStatement updClientes = conn.prepareStatement("UPDATE clientes SET tipo_cliente = ? WHERE LOWER(tipo_cliente) = LOWER(?) AND usuario_id = ?");
+                        updClientes.setString(1, nombre);
+                        updClientes.setString(2, nombreAnterior);
+                        updClientes.setInt(3, userId);
+                        updClientes.executeUpdate();
+                        updClientes.close();
+
+                        PreparedStatement updReglas = conn.prepareStatement("UPDATE reglas_ruteo SET categoria = ? WHERE LOWER(categoria) = LOWER(?) AND usuario_id = ?");
+                        updReglas.setString(1, nombre);
+                        updReglas.setString(2, nombreAnterior);
+                        updReglas.setInt(3, userId);
+                        updReglas.executeUpdate();
+                        updReglas.close();
+                    }
+                    Map<String, Object> r = new HashMap<>();
+                    r.put("id", id);
+                    r.put("nombre", nombre);
+                    sendResponse(exchange, 200, gson.toJson(r));
+                } else if ("DELETE".equals(exchange.getRequestMethod())) {
+                    String query = exchange.getRequestURI().getQuery();
+                    if (query == null || !query.contains("id=")) {
+                        sendError(exchange, 400, "ID requerido");
+                        return;
+                    }
+                    int id = Integer.parseInt(query.split("id=")[1].split("&")[0]);
+
+                    PreparedStatement find = conn.prepareStatement("SELECT nombre FROM categorias WHERE id = ? AND usuario_id = ?");
+                    find.setInt(1, id);
+                    find.setInt(2, userId);
+                    ResultSet rsFind = find.executeQuery();
+                    if (!rsFind.next()) {
+                        find.close();
+                        sendError(exchange, 404, "Categoría no encontrada");
+                        return;
+                    }
+                    String nombre = rsFind.getString("nombre");
+                    find.close();
+
+                    PreparedStatement countStmt = conn.prepareStatement("SELECT COUNT(*) FROM clientes WHERE activo = true AND LOWER(tipo_cliente) = LOWER(?) AND usuario_id = ?");
+                    countStmt.setString(1, nombre);
+                    countStmt.setInt(2, userId);
+                    ResultSet rsCount = countStmt.executeQuery();
+                    rsCount.next();
+                    int enUso = rsCount.getInt(1);
+                    countStmt.close();
+                    if (enUso > 0) {
+                        Map<String, Object> err = new HashMap<>();
+                        err.put("error", "categoria_en_uso");
+                        err.put("message", "No se puede eliminar: hay " + enUso + " cliente(s) con esta categoría asignada.");
+                        err.put("cliente_count", enUso);
+                        sendResponse(exchange, 400, gson.toJson(err));
+                        return;
+                    }
+
+                    PreparedStatement delCat = conn.prepareStatement("DELETE FROM categorias WHERE id = ? AND usuario_id = ?");
+                    delCat.setInt(1, id);
+                    delCat.setInt(2, userId);
+                    delCat.executeUpdate();
+                    delCat.close();
+
+                    PreparedStatement delRegla = conn.prepareStatement("DELETE FROM reglas_ruteo WHERE LOWER(categoria) = LOWER(?) AND usuario_id = ?");
+                    delRegla.setString(1, nombre);
+                    delRegla.setInt(2, userId);
+                    delRegla.executeUpdate();
+                    delRegla.close();
+
+                    sendResponse(exchange, 200, "{\"status\":\"deleted\"}");
+                } else {
+                    exchange.sendResponseHeaders(405, -1);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                sendError(exchange, 500, "Error interno del servidor");
+            }
+        }
+    }
+
     static class EstadisticasHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -1466,6 +1684,43 @@ String dateFilter = switch (periodo) {
             }
         }
         return null;
+    }
+
+    /** Crea las categorías por defecto para un usuario si todavía no tiene ninguna definida. */
+    private static void asegurarCategoriasDefault(Connection conn, int userId) throws SQLException {
+        PreparedStatement countStmt = conn.prepareStatement("SELECT COUNT(*) FROM categorias WHERE usuario_id = ?");
+        countStmt.setInt(1, userId);
+        ResultSet rs = countStmt.executeQuery();
+        rs.next();
+        if (rs.getInt(1) > 0) {
+            countStmt.close();
+            return;
+        }
+        countStmt.close();
+
+        List<String> nombres = new ArrayList<>(List.of("supermercado", "mayorista / distribuidor", "minorista/gastronómico"));
+        PreparedStatement usadosStmt = conn.prepareStatement("SELECT DISTINCT tipo_cliente FROM clientes WHERE activo = true AND usuario_id = ? AND tipo_cliente IS NOT NULL AND tipo_cliente <> ''");
+        usadosStmt.setInt(1, userId);
+        ResultSet rsUsados = usadosStmt.executeQuery();
+        while (rsUsados.next()) {
+            String tc = rsUsados.getString(1).trim();
+            boolean existe = false;
+            for (String n : nombres) {
+                if (n.equalsIgnoreCase(tc)) { existe = true; break; }
+            }
+            if (!existe) nombres.add(tc);
+        }
+        usadosStmt.close();
+
+        PreparedStatement ins = conn.prepareStatement("INSERT INTO categorias (nombre, activo, usuario_id) VALUES (?, true, ?)");
+        for (String n : nombres) {
+            ins.setString(1, n);
+            ins.setInt(2, userId);
+            try {
+                ins.executeUpdate();
+            } catch (SQLException ignored) { }
+        }
+        ins.close();
     }
 
     private static void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
