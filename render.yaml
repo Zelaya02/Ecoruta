@@ -1,0 +1,24 @@
+# EcoRuta unificado — deploy en Render (app + postgres)
+# Conectar este repo (Zelaya02/Ecoruta) en Render → New → Blueprint → selecciona este archivo.
+# El backend Java lee DATABASE_URL automáticamente (Main.parseDatabaseUrl) y crea
+# el esquema + tabla denuncias + usuarios por rol al arrancar.
+services:
+  - type: web
+    name: ecoruta
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ecoruta-db
+          property: connectionString
+      - key: FRONTEND_DIR
+        value: /app/frontend
+      # Opcional: distancias reales OSRM/ORS. Sin esto usa Haversine.
+      - key: ORS_API_KEY
+        sync: false
+databases:
+  - name: ecoruta-db
+    plan: free
+    databaseName: ruteo_db

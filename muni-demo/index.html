@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Municipalidad De Asunción - Portal Ciudadano</title>
+<style>
+/* =====================================================
+   VARIABLES (colores reales del sitio original)
+   ===================================================== */
+:root {
+  --palette1: #b02b2d;
+  --palette2: #912224;
+  --palette3: #000000;
+  --palette4: #484848;
+  --palette5: #797979;
+  --palette6: #a0a0a0;
+  --palette7: #EDF2F7;
+  --palette8: #F7FAFC;
+  --palette9: #ffffff;
+  --content-width: 1500px;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--palette4);
+  background: var(--palette8);
+}
+
+a { text-decoration: none; color: inherit; }
+img { max-width: 100%; height: auto; display: block; }
+button { font-family: inherit; }
+
+.site { background: var(--palette9); max-width: 100%; margin: 0 auto; }
+.site-container { max-width: var(--content-width); margin: 0 auto; padding: 0 1.5rem; }
+
+/* =====================================================
+   HEADER
+   ===================================================== */
+.site-header { background: transparent; padding: 20px 0 0; }
+.header-top {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 1.5rem 20px;
+  position: relative;
+}
+.logo-img { max-width: 300px; width: 100%; cursor: pointer; }
+
+/* =====================================================
+   NAV DESKTOP + DROPDOWNS
+   ===================================================== */
+.main-nav { padding: 0 1.5rem 15px; display: flex; justify-content: center; }
+.main-nav ul { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; }
+.main-nav > ul > li { position: relative; }
+.main-nav > ul > li > a {
+  display: block;
+  padding: 0.6em 1.2em;
+  color: var(--palette5);
+  font-size: 17px;
+  font-weight: 400;
+  transition: color .2s;
+  cursor: pointer;
+}
+.main-nav > ul > li > a:hover { color: var(--palette1); }
+.main-nav > ul > li.current-menu-item > a { color: var(--palette3); }
+/* Botón de acceso al sistema EcoRuta (login por roles) */
+.main-nav a.nav-acceso {
+  color: var(--palette1) !important;
+  font-weight: 700;
+  border: 2px solid var(--palette1);
+  border-radius: 4px;
+  padding: 0.4em 1em !important;
+  margin-left: 0.5em;
+  transition: background .2s, color .2s;
+}
+.main-nav a.nav-acceso:hover { background: var(--palette1); color: #fff !important; }
+.drawer-menu a.drawer-acceso { color: #fff !important; font-weight: 700; }
+
+.main-nav > ul > li.has-children > a::after {
+  content: ' ▾';
+  font-size: 12px;
+  opacity: .6;
+  display: inline-block;
+  transition: transform .25s ease;
+}
+.main-nav > ul > li.has-children:hover > a::after { transform: rotate(180deg); }
+
+.main-nav .sub-menu {
+  position: absolute;
+  top: 100%; left: 0;
+  background: var(--palette3);
+  box-shadow: 0 2px 13px rgba(0,0,0,.1);
+  min-width: 220px;
+  z-index: 100;
+  padding: 0; margin: 0; list-style: none;
+  opacity: 0; visibility: hidden; transform: translateY(-8px);
+  pointer-events: none;
+  transition: opacity .25s ease, transform .25s ease, visibility 0s linear .25s;
+}
+.main-nav > ul > li:hover > .sub-menu,
+.main-nav > ul > li:focus-within > .sub-menu {
+  opacity: 1; visibility: visible; transform: translateY(0);
+  pointer-events: auto;
+  transition: opacity .25s ease, transform .25s ease, visibility 0s linear 0s;
+}
+.main-nav .sub-menu li { position: relative; }
+.main-nav .sub-menu li a {
+  display: block;
+  padding: 1em;
+  width: 220px;
+  color: var(--palette8);
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  transition: background .2s, color .2s, padding-left .2s;
+}
+.main-nav .sub-menu li a:hover {
+  background: var(--palette4);
+  color: var(--palette9);
+  padding-left: 1.3em;
+}
+.main-nav .sub-menu .sub-menu { top: 0; left: 100%; transform: translateX(-8px); }
+.main-nav .sub-menu li:hover > .sub-menu,
+.main-nav .sub-menu li:focus-within > .sub-menu { transform: translateX(0); }
+
+/* =====================================================
+   SLIDER
+   ===================================================== */
+.slider {
+  position: relative; width: 100%; overflow: hidden;
+  background: #000; aspect-ratio: 1657 / 442;
+}
+.slides-track { position: relative; width: 100%; height: 100%; }
+.slide {
+  position: absolute; inset: 0;
+  opacity: 0; visibility: hidden;
+  transition: opacity .6s ease, visibility 0s linear .6s;
+  z-index: 1;
+}
+.slide.active {
+  opacity: 1; visibility: visible; z-index: 2;
+  transition: opacity .6s ease, visibility 0s linear 0s;
+}
+.slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.slider-dots {
+  position: absolute; bottom: 15px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 10;
+}
+.slider-dots button {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid #fff; background: transparent;
+  cursor: pointer; padding: 0;
+  transition: background .2s, transform .2s;
+}
+.slider-dots button:hover { transform: scale(1.3); }
+.slider-dots button.active { background: #fff; }
+
+.slider-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(0,0,0,.4); color: #fff;
+  border: none; width: 44px; height: 44px;
+  font-size: 24px; cursor: pointer; z-index: 10; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s, transform .2s;
+}
+.slider-arrow.prev { left: 15px; }
+.slider-arrow.next { right: 15px; }
+.slider-arrow:hover { background: rgba(0,0,0,.7); transform: translateY(-50%) scale(1.1); }
+
+/* =====================================================
+   SECCIONES
+   ===================================================== */
+.section-title {
+  background: var(--palette1);
+  color: #fff;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 4.8px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 50px;
+  padding: 8px 20px;
+  margin: 40px auto;
+}
+
+.noticias-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+  padding: 0 1.5rem;
+  max-width: var(--content-width);
+  margin: 0 auto 40px;
+}
+.noticia { display: flex; flex-direction: column; cursor: pointer; }
+.noticia-thumb { margin-bottom: 1em; overflow: hidden; }
+.noticia-thumb img {
+  width: 100%; aspect-ratio: 16/9; object-fit: cover;
+  transition: transform .4s ease;
+}
+.noticia:hover .noticia-thumb img { transform: scale(1.05); }
+.noticia-cat {
+  font-size: 13px; color: var(--palette1);
+  text-transform: uppercase; font-weight: 600;
+  margin-bottom: 8px; letter-spacing: .5px;
+}
+.noticia-title {
+  font-size: 18px; color: var(--palette3);
+  font-weight: 700; line-height: 1.4;
+  margin-bottom: 10px; transition: color .2s;
+}
+.noticia:hover .noticia-title { color: var(--palette1); }
+.noticia-date { font-size: 13px; color: var(--palette5); margin-bottom: 12px; }
+.noticia-more {
+  color: var(--palette1); font-weight: 600; font-size: 13px;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: color .2s;
+}
+.noticia:hover .noticia-more { color: var(--palette2); }
+
+.infobox-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+  padding: 0 1.5rem;
+  max-width: var(--content-width);
+  margin: 60px auto;
+}
+.infobox {
+  background: #fff;
+  border: 5px solid var(--palette7);
+  padding: 1.5rem;
+  margin-top: 50px;
+  text-align: left;
+  transition: transform .25s ease, box-shadow .25s ease;
+  cursor: pointer;
+  display: block;
+}
+.infobox:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 8px 20px rgba(176,43,45,.12);
+}
+.infobox-media {
+  margin-top: -75px; margin-bottom: 20px;
+  display: flex; justify-content: center;
+}
+.infobox-media img {
+  max-width: 88px; border: 5px solid var(--palette7);
+  background: #fff; border-radius: 50%;
+  width: 88px; height: 88px; object-fit: cover;
+}
+.infobox h2 {
+  font-size: 22px; color: var(--palette3);
+  font-weight: 700; margin: 5px 0 10px;
+  text-align: center;
+}
+.infobox p { color: var(--palette4); font-size: 15px; text-align: center; }
+
+.banner-destacado {
+  max-width: var(--content-width);
+  margin: 40px auto; padding: 0 1.5rem;
+}
+.banner-destacado img { width: 100%; border-radius: 4px; }
+.banner-destacado a { display: block; }
+
+/* =====================================================
+   FOOTER
+   ===================================================== */
+.site-footer {
+  background: var(--palette8);
+  border-top: 1px solid var(--palette7);
+  padding: 30px 1.5rem 20px;
+  margin-top: 60px;
+}
+.footer-social {
+  display: flex; justify-content: center;
+  flex-wrap: wrap; gap: 10px; margin-bottom: 30px;
+}
+
+ .footer-social {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 30px;
+}
+
+.footer-social a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--palette7);
+  color: var(--palette4);
+  padding: 10px 16px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background .2s, color .2s;
+}
+
+.footer-social a:hover {
+  background: var(--palette1);
+  color: #fff;
+}
+
+.footer-social a svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.footer-social a svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.footer-social a span {
+  display: inline-block;
+}
+.footer-social a:hover {
+  background: var(--palette2);
+  transform: translateY(-2px);
+}
+.footer-grid {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px; text-align: center;
+}
+.footer-col { font-size: 14px; color: var(--palette4); line-height: 1.8; }
+.footer-col img { max-width: 300px; margin: 0 auto 15px; }
+
+/* =====================================================
+   WHATSAPP FLOTANTE
+   ===================================================== */
+.wa-btn {
+  position: fixed; bottom: 30px; right: 30px;
+  width: 60px; height: 60px;
+  background: #2db742; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+  z-index: 999;
+  transition: transform .2s;
+  border: none;
+}
+.wa-btn:hover { transform: scale(1.1); }
+.wa-btn svg { width: 34px; height: 34px; }
+
+/* =====================================================
+   DRAWER MOBILE
+   ===================================================== */
+.mobile-toggle {
+  display: none; background: transparent; border: none;
+  cursor: pointer; padding: 0.4em 0.6em;
+  font-size: 20px; color: var(--palette5);
+}
+.drawer-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  opacity: 0; visibility: hidden;
+  transition: opacity .3s ease, visibility 0s linear .3s;
+  z-index: 9998;
+}
+.drawer-overlay.open {
+  opacity: 1; visibility: visible;
+  transition: opacity .3s ease, visibility 0s linear 0s;
+}
+.mobile-drawer {
+  position: fixed; top: 0; right: 0;
+  width: 320px; max-width: 85vw; height: 100vh;
+  background: var(--palette3); color: #fff;
+  z-index: 9999;
+  transform: translateX(100%);
+  transition: transform .3s ease;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.mobile-drawer.open { transform: translateX(0); }
+.drawer-header {
+  display: flex; justify-content: flex-end;
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.drawer-close {
+  background: transparent; border: none; color: #fff;
+  font-size: 28px; cursor: pointer; padding: 0 8px;
+  line-height: 1; transition: color .2s;
+}
+.drawer-close:hover { color: var(--palette1); }
+.drawer-menu { list-style: none; padding: 0; margin: 0; }
+.drawer-menu li { border-bottom: 1px solid rgba(255,255,255,.1); }
+.drawer-menu > li > a,
+.drawer-menu > li > .drawer-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 1em 20px;
+  color: var(--palette8); font-size: 14px;
+  background: transparent; border: none;
+  text-align: left; cursor: pointer;
+  transition: background .2s, color .2s;
+}
+.drawer-menu > li > a:hover,
+.drawer-menu > li > .drawer-toggle-row:hover {
+  background: rgba(255,255,255,.05); color: #fff;
+}
+.drawer-menu > li.current > a { color: var(--palette1); }
+.drawer-toggle-icon { font-size: 14px; transition: transform .25s ease; }
+.drawer-menu li.open > .drawer-toggle-row .drawer-toggle-icon { transform: rotate(180deg); }
+.drawer-submenu {
+  list-style: none; max-height: 0; overflow: hidden;
+  background: rgba(255,255,255,.03);
+  transition: max-height .35s ease;
+}
+.drawer-menu li.open > .drawer-submenu { max-height: 1000px; }
+.drawer-submenu li a {
+  display: block;
+  padding: .8em 20px .8em 40px;
+  color: var(--palette6); font-size: 13px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  transition: color .2s, background .2s;
+}
+.drawer-submenu li a:hover { color: #fff; background: rgba(255,255,255,.05); }
+
+/* =====================================================
+   BUSCADOR
+   ===================================================== */
+.search-bar {
+  max-width: var(--content-width);
+  margin: 30px auto 0;
+  padding: 0 1.5rem;
+}
+.search-bar input {
+  width: 100%;
+  padding: 14px 20px;
+  border: 2px solid var(--palette7);
+  border-radius: 4px;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .2s;
+}
+.search-bar input:focus { border-color: var(--palette1); }
+
+/* =====================================================
+   VISTA DETALLE
+   ===================================================== */
+.vista-detalle { max-width: 900px; margin: 40px auto; padding: 0 1.5rem; }
+.vista-detalle .volver {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--palette1); font-weight: 600;
+  font-size: 14px; margin-bottom: 25px;
+  cursor: pointer;
+  transition: color .2s;
+}
+.vista-detalle .volver:hover { color: var(--palette2); }
+.vista-detalle .cat {
+  font-size: 13px; color: var(--palette1);
+  text-transform: uppercase; font-weight: 600;
+  letter-spacing: .5px; margin-bottom: 10px;
+}
+.vista-detalle h1 {
+  font-size: 34px; color: var(--palette3);
+  font-weight: 700; line-height: 1.3;
+  margin-bottom: 15px;
+}
+.vista-detalle .fecha { font-size: 14px; color: var(--palette5); margin-bottom: 25px; }
+.vista-detalle img.principal { width: 100%; border-radius: 4px; margin-bottom: 30px; }
+.vista-detalle .cuerpo p {
+  font-size: 17px; line-height: 1.8;
+  color: var(--palette4); margin-bottom: 18px;
+}
+
+.vista-generica {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 0 1.5rem;
+  text-align: center;
+}
+.vista-generica h1 {
+  font-size: 34px; color: var(--palette3);
+  font-weight: 700; margin-bottom: 20px;
+}
+.vista-generica p {
+  font-size: 17px; line-height: 1.8;
+  color: var(--palette4); margin-bottom: 30px;
+}
+.vista-generica .placeholder-box {
+  background: var(--palette7);
+  border: 2px dashed var(--palette6);
+  border-radius: 8px;
+  padding: 60px 20px;
+  color: var(--palette5);
+  font-size: 15px;
+}
+
+/* =====================================================
+   RESPONSIVE
+   ===================================================== */
+@media (max-width: 1024px) {
+  .noticias-grid, .infobox-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 767px) {
+  body { font-size: 15px; }
+  .main-nav { display: none; }
+  .mobile-toggle { display: block; }
+  .header-top { justify-content: center; padding-bottom: 10px; }
+  .logo-img { max-width: 250px; }
+  .mobile-toggle {
+    position: absolute; top: 50%; right: 1.5rem;
+    transform: translateY(-50%);
+  }
+  .noticias-grid, .infobox-row, .footer-grid { grid-template-columns: 1fr; }
+  .section-title { font-size: 20px; letter-spacing: 2px; line-height: 40px; }
+  .slider { aspect-ratio: 16 / 9; }
+  .slider-arrow { width: 36px; height: 36px; font-size: 20px; }
+  .vista-detalle h1, .vista-generica h1 { font-size: 24px; }
+}
+body.drawer-open { overflow: hidden; }
+</style>
+</head>
+<body>
+
+<div class="site">
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div class="header-top">
+      <!-- 🖼️ LOGO: img/logo.png -->
+      <img class="logo-img"
+           src="img/logo.png"
+           alt="Municipalidad De Asunción"
+           onclick="navigateTo('#/')"
+           onerror="this.src='https://placehold.co/600x180/ffffff/b02b2d?text=img%2Flogo.png'">
+      <button class="mobile-toggle" id="openDrawer" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <nav class="main-nav">
+      <ul id="navDesktop"></ul>
+    </nav>
+  </header>
+
+  <!-- ===== CONTENIDO DINÁMICO ===== -->
+  <main id="app"></main>
+
+</div>
+
+<!-- ===== FOOTER ===== -->
+<footer class="site-footer">
+ <div class="footer-social">
+  <a href="https://www.facebook.com/asuncionmuni" target="_blank" rel="noopener" aria-label="Facebook">
+    <svg fill="currentColor" viewBox="0 0 32 32" width="20" height="20"><path d="M31.997 15.999c0-8.836-7.163-15.999-15.999-15.999s-15.999 7.163-15.999 15.999c0 7.985 5.851 14.604 13.499 15.804v-11.18h-4.062v-4.625h4.062v-3.525c0-4.010 2.389-6.225 6.043-6.225 1.75 0 3.581 0.313 3.581 0.313v3.937h-2.017c-1.987 0-2.607 1.233-2.607 2.498v3.001h4.437l-0.709 4.625h-3.728v11.18c7.649-1.2 13.499-7.819 13.499-15.804z"/></svg>
+    <span>Facebook</span>
+  </a>
+  <a href="https://twitter.com/AsuncionMuni" target="_blank" rel="noopener" aria-label="Twitter">
+    <svg fill="currentColor" viewBox="0 0 26 28" width="20" height="20"><path d="M25.312 6.375c-0.688 1-1.547 1.891-2.531 2.609 0.016 0.219 0.016 0.438 0.016 0.656 0 6.672-5.078 14.359-14.359 14.359-2.859 0-5.516-0.828-7.75-2.266 0.406 0.047 0.797 0.063 1.219 0.063 2.359 0 4.531-0.797 6.266-2.156-2.219-0.047-4.078-1.5-4.719-3.5 0.313 0.047 0.625 0.078 0.953 0.078 0.453 0 0.906-0.063 1.328-0.172-2.312-0.469-4.047-2.5-4.047-4.953v-0.063c0.672 0.375 1.453 0.609 2.281 0.641-1.359-0.906-2.25-2.453-2.25-4.203 0-0.938 0.25-1.797 0.688-2.547 2.484 3.062 6.219 5.063 10.406 5.281-0.078-0.375-0.125-0.766-0.125-1.156 0-2.781 2.25-5.047 5.047-5.047 1.453 0 2.766 0.609 3.687 1.594 1.141-0.219 2.234-0.641 3.203-1.219-0.375 1.172-1.172 2.156-2.219 2.781 1.016-0.109 2-0.391 2.906-0.781z"/></svg>
+    <span>Twitter</span>
+  </a>
+  <a href="https://www.instagram.com/muniasu" target="_blank" rel="noopener" aria-label="Instagram">
+    <svg fill="currentColor" viewBox="0 0 32 32" width="20" height="20"><path d="M16 2.882c4.271 0 4.777 0.016 6.462 0.093 1.56 0.071 2.406 0.332 2.969 0.551 0.746 0.29 1.278 0.636 1.838 1.196 0.56 0.56 0.906 1.092 1.196 1.838 0.219 0.563 0.48 1.409 0.551 2.969 0.077 1.685 0.093 2.191 0.093 6.462s-0.016 4.777-0.093 6.462c-0.071 1.56-0.332 2.406-0.551 2.969-0.29 0.746-0.636 1.278-1.196 1.838-0.56 0.56-1.092 0.906-1.838 1.196-0.563 0.219-1.409 0.48-2.969 0.551-1.685 0.077-2.191 0.093-6.462 0.093s-4.777-0.016-6.462-0.093c-1.56-0.071-2.406-0.332-2.969-0.551-0.746-0.29-1.278-0.636-1.838-1.196-0.56-0.56-0.906-1.092-1.196-1.838-0.219-0.563-0.48-1.409-0.551-2.969-0.077-1.685-0.093-2.191-0.093-6.462s0.016-4.777 0.093-6.462c0.071-1.56 0.332-2.406 0.551-2.969 0.29-0.746 0.636-1.278 1.196-1.838 0.56-0.56 1.092-0.906 1.838-1.196 0.563-0.219 1.409-0.48 2.969-0.551 1.685-0.077 2.191-0.093 6.462-0.093M16 0.882c-4.343 0-4.887 0.018-6.593 0.096-1.702 0.078-2.865 0.348-3.881 0.744-1.051 0.408-1.943 0.955-2.832 1.844-0.889 0.889-1.436 1.781-1.844 2.832-0.396 1.016-0.666 2.179-0.744 3.881-0.078 1.706-0.096 2.25-0.096 6.593s0.018 4.887 0.096 6.593c0.078 1.702 0.348 2.865 0.744 3.881 0.408 1.051 0.955 1.943 1.844 2.832 0.889 0.889 1.781 1.436 2.832 1.844 1.016 0.396 2.179 0.666 3.881 0.744 1.706 0.078 2.25 0.096 6.593 0.096s4.887-0.018 6.593-0.096c1.702-0.078 2.865-0.348 3.881-0.744 1.051-0.408 1.943-0.955 2.832-1.844 0.889-0.889 1.436-1.781 1.844-2.832 0.396-1.016 0.666-2.179 0.744-3.881 0.078-1.706 0.096-2.25 0.096-6.593s-0.018-4.887-0.096-6.593c-0.078-1.702-0.348-2.865-0.744-3.881-0.408-1.051-0.955-1.943-1.844-2.832-0.889-0.889-1.781-1.436-2.832-1.844-1.016-0.396-2.179-0.666-3.881-0.744-1.706-0.078-2.25-0.096-6.593-0.096zM16 8.326c-4.239 0-7.674 3.435-7.674 7.674s3.435 7.674 7.674 7.674 7.674-3.435 7.674-7.674-3.435-7.674-7.674-7.674zM16 21.674c-3.135 0-5.674-2.539-5.674-5.674s2.539-5.674 5.674-5.674 5.674 2.539 5.674 5.674-2.539 5.674-5.674 5.674zM26.406 7.594c0 0.992-0.804 1.796-1.796 1.796s-1.796-0.804-1.796-1.796 0.804-1.796 1.796-1.796 1.796 0.804 1.796 1.796z"/></svg>
+    <span>Instagram</span>
+  </a>
+  <a href="https://www.tiktok.com/@asuncionmuni" target="_blank" rel="noopener" aria-label="TikTok">
+    <svg fill="currentColor" viewBox="0 0 32 32" width="20" height="20"><path d="M16.707 0.027c1.747-0.027 3.48-0.013 5.213-0.027 0.107 2.040 0.84 4.12 2.333 5.56 1.493 1.48 3.6 2.16 5.653 2.387v5.373c-1.92-0.067-3.853-0.467-5.6-1.293-0.76-0.347-1.467-0.787-2.16-1.24-0.013 3.893 0.013 7.787-0.027 11.667-0.107 1.867-0.72 3.72-1.8 5.253-1.747 2.56-4.773 4.227-7.88 4.28-1.907 0.107-3.813-0.413-5.44-1.373-2.693-1.587-4.587-4.493-4.867-7.613-0.027-0.667-0.040-1.333-0.013-1.987 0.24-2.533 1.493-4.96 3.44-6.613 2.213-1.92 5.307-2.84 8.2-2.293 0.027 1.973-0.053 3.947-0.053 5.92-1.32-0.427-2.867-0.307-4.027 0.493-0.84 0.547-1.48 1.387-1.813 2.333-0.28 0.68-0.2 1.427-0.187 2.147 0.32 2.187 2.427 4.027 4.667 3.827 1.493-0.013 2.92-0.88 3.693-2.147 0.253-0.44 0.533-0.893 0.547-1.413 0.133-2.387 0.080-4.76 0.093-7.147 0.013-5.373-0.013-10.733 0.027-16.093z"/></svg>
+    <span>TikTok</span>
+  </a>
+  <a href="https://t.me/muniasu" target="_blank" rel="noopener" aria-label="Telegram">
+    <svg fill="currentColor" viewBox="0 0 32 32" width="20" height="20"><path d="M22.05 7.945l-14.063 5.469c-0.961 0.391-0.945 0.918-0.176 1.152l3.609 1.125 8.352-5.273c0.39-0.242 0.75-0.109 0.457 0.148l-6.762 6.105-0.258 3.715c0.371 0 0.535-0.164 0.734-0.36l1.766-1.715 3.672 2.711c0.676 0.375 1.164 0.18 1.328-0.625l2.406-11.344c0.246-0.988-0.375-1.434-1.066-1.109z"/></svg>
+    <span>Telegram</span>
+  </a>
+  <a href="https://www.youtube.com/asuncionmuni" target="_blank" rel="noopener" aria-label="YouTube">
+    <svg fill="currentColor" viewBox="0 0 28 28" width="20" height="20"><path d="M11.109 17.625l7.562-3.906-7.562-3.953v7.859zM14 4.156c5.891 0 9.797 0.281 9.797 0.281 0.547 0.063 1.75 0.063 2.812 1.188 0 0 0.859 0.844 1.109 2.781 0.297 2.266 0.281 4.531 0.281 4.531v2.125s0.016 2.266-0.281 4.531c-0.25 1.922-1.109 2.781-1.109 2.781-1.062 1.109-2.266 1.109-2.812 1.172 0 0-3.906 0.297-9.797 0.297v0c-7.281-0.063-9.516-0.281-9.516-0.281-0.625-0.109-2.031-0.078-3.094-1.188 0 0-0.859-0.859-1.109-2.781-0.297-2.266-0.281-4.531-0.281-4.531v-2.125s-0.016-2.266 0.281-4.531c0.25-1.937 1.109-2.781 1.109-2.781 1.062-1.125 2.266-1.125 2.812-1.188 0 0 3.906-0.281 9.797-0.281v0z"/></svg>
+    <span>YouTube</span>
+  </a>
+</div>
+  <div class="footer-grid">
+    <div class="footer-col">
+      <!-- 🖼️ ZÓCALO: img/zocalo.png -->
+      <img src="img/zocalo.png"
+           alt="Zócalo"
+           onerror="this.src='https://placehold.co/300x84/ffffff/b02b2d?text=img%2Fzocalo.png'">
+      <p>© 2026 Municipalidad De Asunción</p>
+    </div>
+    <div class="footer-col">
+      <p>Mcal. López 5556 e/ Capitán Bueno<br>
+      Central telefónica - (+595 21) 627 3000<br>
+      (+595.021) 663 311 R.A.<br>
+      Asunción - Paraguay<br>
+      Lunes a Viernes de 07:00 a 16:00hs<br>
+      Sábados de 07:30 a 11:30</p>
+    </div>
+    <div class="footer-col"></div>
+  </div>
+</footer>
+
+<!-- ===== WHATSAPP FLOTANTE ===== -->
+<button class="wa-btn" aria-label="WhatsApp" onclick="alert('Chat de atención al ciudadano (demo)')">
+  <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <path fill="#fff" d="M0,512l35.31-128C12.359,344.276,0,300.138,0,254.234C0,114.759,114.759,0,255.117,0S512,114.759,512,254.234S395.476,512,255.117,512c-44.138,0-86.51-14.124-124.469-35.31L0,512z"/>
+    <path fill="#2db742" d="M137.71,430.786l7.945,4.414c32.662,20.303,70.621,32.662,110.345,32.662c115.641,0,211.862-96.221,211.862-213.628S371.641,44.138,255.117,44.138S44.138,137.71,44.138,254.234c0,40.607,11.476,80.331,32.662,113.876l5.297,7.945l-20.303,74.152L137.71,430.786z"/>
+    <path fill="#FEFEFE" d="M187.145,135.945l-16.772-0.883c-5.297,0-10.593,1.766-14.124,5.297c-7.945,7.062-21.186,20.303-24.717,37.959c-6.179,26.483,3.531,58.262,26.483,90.041s67.09,82.979,144.772,105.048c24.717,7.062,44.138,2.648,60.028-7.062c12.359-7.945,20.303-20.303,22.952-33.545l2.648-12.359c0.883-3.531-0.883-7.945-4.414-9.71l-55.614-25.6c-3.531-1.766-7.945-0.883-10.593,2.648l-22.069,28.248c-1.766,1.766-4.414,2.648-7.062,1.766c-15.007-5.297-65.324-26.483-92.69-79.448c-0.883-2.648-0.883-5.297,0.883-7.062l21.186-23.834c1.766-2.648,2.648-6.179,1.766-8.828l-25.6-57.379C193.324,138.593,190.676,135.945,187.145,135.945"/>
+  </svg>
+</button>
+
+<!-- ===== DRAWER MOBILE ===== -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+  <div class="drawer-header">
+    <button class="drawer-close" id="closeDrawer" aria-label="Cerrar menú">×</button>
+  </div>
+  <ul class="drawer-menu" id="drawerMenu"></ul>
+</aside>
+
+<script>
+/* =====================================================
+   DATOS: MENÚ COMPLETO
+   ===================================================== */
+const menuItems = [
+  { label: 'Inicio', href: '#/' },
+  {
+    label: 'Intendencia',
+    children: [
+      { label: 'Intendente', href: '#/institucional/intendente' },
+      { label: 'Intendencia', href: '#/institucional/intendencia' },
+    ],
+  },
+  {
+    label: 'Trámites',
+    children: [
+      { label: 'Portal Ciudadano', href: '#/tramites/portal' },
+      { label: 'Reclamos y Expedientes', href: '#/tramites/reclamos' },
+      { label: 'Trámites Online', href: '#/tramites/online' },
+      { label: 'Formularios y Requisitos', href: '#/tramites/formularios' },
+      { label: 'Activaciones – Costanera', href: '#/tramites/costanera' },
+      { label: 'Licencias de conducir', href: '#/tramites/licencias' },
+      { label: 'Habilitación vehicular', href: '#/tramites/habilitacion' },
+      { label: 'Defensa al Consumidor', href: '#/tramites/defensa' },
+    ],
+  },
+  {
+    label: 'Servicios',
+    children: [
+      { label: 'Mapa Interactivo de Asunción', href: '#/servicios/mapa' },
+      { label: 'Mapa Descargable', href: '#/servicios/mapa-descargable' },
+      { label: 'Asunción 500 Años', href: '#/servicios/500' },
+      { label: 'Historia de mis Calles', href: '#/servicios/historia-calles' },
+      { label: 'Tesoros de mi Ciudad', href: '#/servicios/tesoros' },
+      { label: 'Centros Municipales', href: '#/servicios/centros' },
+      { label: 'Policlínico Municipal', href: '#/servicios/policlinico' },
+      { label: 'Mapa de Servicios para Adultos Mayores', href: '#/servicios/adultos' },
+      { label: 'CODENI', href: '#/servicios/codeni' },
+      { label: 'Patrimonio Vivo, Asunción', href: '#/servicios/patrimonio' },
+      { label: 'Atención al Ciudadano', href: '#/servicios/atencion' },
+      { label: 'Guías de Huertas y Jardines', href: '#/servicios/huertas' },
+      { label: 'Guías de Biodiversidad del AMA', href: '#/servicios/biodiversidad' },
+    ],
+  },
+  {
+    label: 'Transparencia',
+    children: [
+      { label: 'Rendición de Cuentas 2025', href: '#/transparencia/rendicion' },
+      {
+        label: 'Hesakã',
+        children: [
+          { label: 'Resumen de Salarios Mensual', href: '#/transparencia/hesaka/mensual' },
+          { label: 'Resumen de Salarios Anual', href: '#/transparencia/hesaka/anual' },
+        ],
+      },
+      { label: 'Presupuesto', href: '#/transparencia/presupuesto' },
+      { label: 'Licitaciones', href: '#/transparencia/licitaciones' },
+      { label: 'Plan Regulador', href: '#/transparencia/plan-regulador' },
+      { label: 'Inventario de Bienes Municipales', href: '#/transparencia/inventario' },
+      { label: 'Rendición de viáticos', href: '#/transparencia/viaticos' },
+      { label: 'FONACIDE', href: '#/transparencia/fonacide' },
+      { label: 'Organización y Métodos', href: '#/transparencia/organizacion' },
+      { label: 'Archivos', href: '#/transparencia/archivos' },
+      {
+        label: 'RRHH',
+        children: [
+          { label: 'Postulate', href: '#/transparencia/rrhh/postulate' },
+          { label: 'Movilidad Laboral Interna', href: '#/transparencia/rrhh/mli' },
+          { label: 'Capacitaciones para Funcionarios', href: '#/transparencia/rrhh/capacitaciones' },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Leyes & Reglamentos',
+    children: [
+      { label: 'Ordenanzas', href: '#/leyes/ordenanzas' },
+      { label: 'Resoluciones', href: '#/leyes/resoluciones' },
+      { label: 'Carta Orgánica Municipal', href: '#/leyes/carta' },
+      { label: 'Plan Maestro de la Franja Costera', href: '#/leyes/plan-costero' },
+      { label: 'Reglamento de tránsito', href: '#/leyes/transito' },
+      { label: 'Multas Usuales', href: '#/leyes/multas' },
+    ],
+  },
+  {
+    label: 'Más Información',
+    children: [
+      { label: 'Cultura & Turismo', href: '#/mas/cultura' },
+      { label: 'COFILMA', href: '#/mas/cofilma' },
+      { label: 'SATI', href: '#/mas/sati' },
+      { label: 'Noticias por Direcciones', href: '#/mas/direcciones' },
+      { label: 'Políticas de calidad', href: '#/mas/politicas' },
+      { label: 'Directorio telefónico', href: '#/mas/directorio' },
+      { label: 'Preguntas Frecuentes', href: '#/mas/faq' },
+    ],
+  },
+  // Acceso al sistema EcoRuta (denuncias + rutas). Ruta absoluta: funciona
+  // tanto en local como en Render, se sirva el portal en / o en /muni-demo/.
+  { label: '🔒 Acceder', href: '/login.html', cls: 'nav-acceso' },
+];
+
+/* =====================================================
+   DATOS: NOTICIAS  →  🖼️ img/noticia-N.jpg
+   ===================================================== */
+const noticias = [
+  {
+    id: 1,
+    cat: 'Historia de mis Calles',
+    title: 'La calle Cala\'a recuerda al héroe que, a pesar de ser degradado, superó con heroísmo la circunstancia que le tocó enfrentar en la batalla de Curuzú',
+    date: '11 septiembre, 2026',
+    img: 'img/noticia-1.jpg',
+  },
+  {
+    id: 2,
+    cat: 'Juventud y Deportes',
+    title: 'Asu Joven Fest convoca a jóvenes emprendedores a participar de feria',
+    date: '11 septiembre, 2026',
+    img: 'img/noticia-2.jpg',
+  },
+  {
+    id: 3,
+    cat: 'Vialidad',
+    title: 'Plan ASU 400 llega a 138 cuadras con nuevos frentes de obras',
+    date: '10 septiembre, 2026',
+    img: 'img/noticia-3.jpg',
+  },
+  {
+    id: 4,
+    cat: 'Mercado Nº 4',
+    title: 'Mercado Municipal Nº 4 avanza con más de 430 mejoras durante la gestión del intendente de Asunción Luis Bello',
+    date: '10 septiembre, 2026',
+    img: 'img/noticia-4.jpg',
+  },
+  {
+    id: 5,
+    cat: 'RR.HH',
+    title: 'Cambiar la narrativa: la Municipalidad promueve una mirada sin estigmas sobre la salud mental',
+    date: '10 septiembre, 2026',
+    img: 'img/noticia-5.jpg',
+  },
+  {
+    id: 6,
+    cat: 'Cultura & Turismo',
+    title: 'Talleres primaverales invitan a niños a crear y compartir sus propios trabajos artísticos',
+    date: '9 septiembre, 2026',
+    img: 'img/noticia-6.jpg',
+  },
+];
+
+/* =====================================================
+   RENDER: NAV DESKTOP
+   ===================================================== */
+function renderNavItems(items) {
+  return items.map((item) => {
+    const hasChildren = item.children && item.children.length;
+    return `
+      <li class="${hasChildren ? 'has-children' : ''}">
+        <a href="${item.href || '#'}"${item.cls ? ` class="${item.cls}"` : ''}>${item.label}</a>
+        ${hasChildren ? `<ul class="sub-menu">${renderNavItems(item.children)}</ul>` : ''}
+      </li>
+    `;
+  }).join('');
+}
+document.getElementById('navDesktop').innerHTML = renderNavItems(menuItems);
+
+/* =====================================================
+   RENDER: DRAWER MOBILE
+   ===================================================== */
+function renderDrawerItems(items) {
+  return items.map((item) => {
+    const hasChildren = item.children && item.children.length;
+    if (!hasChildren) {
+      const dCls = item.cls === 'nav-acceso' ? 'drawer-acceso' : (item.cls || '');
+      return `<li><a href="${item.href || '#'}"${dCls ? ` class="${dCls}"` : ''}>${item.label}</a></li>`;
+    }
+    return `
+      <li>
+        <button class="drawer-toggle-row">${item.label} <span class="drawer-toggle-icon">▾</span></button>
+        <ul class="drawer-submenu">
+          ${item.children.map(child => `<li><a href="${child.href || '#'}">${child.label}</a></li>`).join('')}
+        </ul>
+      </li>
+    `;
+  }).join('');
+}
+document.getElementById('drawerMenu').innerHTML = renderDrawerItems(menuItems);
+
+/* =====================================================
+   DRAWER: abrir / cerrar / acordeón
+   ===================================================== */
+const drawer = document.getElementById('mobileDrawer');
+const overlay = document.getElementById('drawerOverlay');
+const openBtn = document.getElementById('openDrawer');
+const closeBtn = document.getElementById('closeDrawer');
+
+function openDrawer() {
+  drawer.classList.add('open');
+  overlay.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('drawer-open');
+}
+function closeDrawer() {
+  drawer.classList.remove('open');
+  overlay.classList.remove('open');
+  drawer.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('drawer-open');
+}
+openBtn.addEventListener('click', openDrawer);
+closeBtn.addEventListener('click', closeDrawer);
+overlay.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
+});
+document.querySelectorAll('.drawer-toggle-row').forEach(btn => {
+  btn.addEventListener('click', () => btn.parentElement.classList.toggle('open'));
+});
+
+/* =====================================================
+   SLIDER  →  🖼️ img/slide-1.jpg ... slide-4.jpg
+   ===================================================== */
+const sliderSlides = [
+  { img: 'img/slide-2.png', href: 'tel:021-627-3010' },
+  { img: 'img/slide-3.jpg', href: '#/servicios/patrimonio' },
+  { img: 'img/slide-4.jpg', href: '#/tramites/portal' },
+  { img: 'img/banner-sati.png', href: '#/tramites/portal' },
+];
+
+let sliderCurrent = 0;
+let sliderTimer = null;
+
+function renderSlider() {
+  return `
+    <section class="slider" id="sliderEl">
+      <div class="slides-track">
+        ${sliderSlides.map((s, i) => `
+          <div class="slide ${i === 0 ? 'active' : ''}">
+            <a href="${s.href}">
+              <img src="${s.img}" alt="Slide ${i + 1}"
+                   onerror="this.src='https://placehold.co/1657x442/b02b2d/ffffff?text=${encodeURIComponent(s.img)}'">
+            </a>
+          </div>
+        `).join('')}
+      </div>
+      <button class="slider-arrow prev" onclick="sliderPrev()" aria-label="Anterior">‹</button>
+      <button class="slider-arrow next" onclick="sliderNext()" aria-label="Siguiente">›</button>
+      <div class="slider-dots" id="sliderDots">
+        ${sliderSlides.map((_, i) => `
+          <button class="${i === 0 ? 'active' : ''}" onclick="sliderGo(${i})" aria-label="Ir al slide ${i + 1}"></button>
+        `).join('')}
+      </div>
+    </section>
+  `;
+}
+
+function updateSliderUI() {
+  const slides = document.querySelectorAll('#app .slide');
+  const dots = document.querySelectorAll('#app .slider-dots button');
+  slides.forEach((s, i) => s.classList.toggle('active', i === sliderCurrent));
+  dots.forEach((d, i) => d.classList.toggle('active', i === sliderCurrent));
+}
+function sliderNext() {
+  sliderCurrent = (sliderCurrent + 1) % sliderSlides.length;
+  updateSliderUI();
+  restartSliderAutoplay();
+}
+function sliderPrev() {
+  sliderCurrent = (sliderCurrent - 1 + sliderSlides.length) % sliderSlides.length;
+  updateSliderUI();
+  restartSliderAutoplay();
+}
+function sliderGo(i) {
+  sliderCurrent = i;
+  updateSliderUI();
+  restartSliderAutoplay();
+}
+function restartSliderAutoplay() {
+  clearInterval(sliderTimer);
+  sliderTimer = setInterval(() => {
+    sliderCurrent = (sliderCurrent + 1) % sliderSlides.length;
+    updateSliderUI();
+  }, 7000);
+}
+function attachSliderHover() {
+  const el = document.getElementById('sliderEl');
+  if (!el) return;
+  el.addEventListener('mouseenter', () => clearInterval(sliderTimer));
+  el.addEventListener('mouseleave', restartSliderAutoplay);
+}
+
+/* =====================================================
+   VISTAS
+   ===================================================== */
+function renderHome() {
+  return `
+    ${renderSlider()}
+    <div class="search-bar">
+      <input type="text" id="buscador" placeholder="Buscar noticias..." oninput="filtrarNoticias(this.value)">
+    </div>
+    <h2 class="section-title">Noticias</h2>
+    <div class="noticias-grid" id="noticiasGrid">
+      ${noticias.map(n => noticiaCardHTML(n)).join('')}
+    </div>
+    <div class="infobox-row">
+      <a href="#/servicios/historia-calles" class="infobox">
+        <div class="infobox-media">
+          <img src="img/icono-historia.jpg" alt="Historia"
+               onerror="this.src='https://placehold.co/88x88/b02b2d/ffffff?text=H'">
+        </div>
+        <h2>Historia de mis calles</h2>
+        <p>Una serie de entregas sobre la nomenclatura de las calles de Asunción.</p>
+      </a>
+      <a href="#/servicios/conexiones" class="infobox">
+        <div class="infobox-media">
+          <img src="img/icono-conexiones.jpg" alt="Conexiones"
+               onerror="this.src='https://placehold.co/88x88/b02b2d/ffffff?text=C'">
+        </div>
+        <h2>Conexiones</h2>
+        <p>Testimonios sobre cómo la gestión municipal impacta en la vida.</p>
+      </a>
+      <a href="#/servicios/tesoros" class="infobox">
+        <div class="infobox-media">
+          <img src="img/icono-tesoros.jpg" alt="Tesoros"
+               onerror="this.src='https://placehold.co/88x88/b02b2d/ffffff?text=T'">
+        </div>
+        <h2>Tesoros de mi ciudad</h2>
+        <p>Materiales imprescindibles para conocer el Patrimonio.</p>
+      </a>
+    </div>
+    <h2 class="section-title">Atención 👀</h2>
+    <div class="banner-destacado">
+      <img src="img/banner-atencion.jpg" alt="Atención"
+           style="max-width:800px;margin:0 auto;"
+           onerror="this.src='https://placehold.co/800x1000/b02b2d/ffffff?text=img%2Fbanner-atencion.jpg'">
+    </div>
+    <div class="banner-destacado">
+      <a href="#/transparencia/rendicion">
+        <img src="img/banner-rendicion.png" alt="Banner"
+             onerror="this.src='https://placehold.co/1699x624/912224/ffffff?text=img%2Fbanner-rendicion.jpg'">
+      </a>
+    </div>
+  `;
+}
+
+function noticiaCardHTML(n) {
+  return `
+    <article class="noticia" onclick="navigateTo('#/noticia/${n.id}')">
+      <div class="noticia-thumb">
+        <img src="${n.img}" alt="${n.title}"
+             onerror="this.src='https://picsum.photos/768/1365?random=${n.id}'">
+      </div>
+      <div class="noticia-cat">${n.cat}</div>
+      <h3 class="noticia-title">${n.title}</h3>
+      <div class="noticia-date">${n.date}</div>
+      <span class="noticia-more">Leer más →</span>
+    </article>
+  `;
+}
+
+function renderNoticiaDetalle(id) {
+  const n = noticias.find(x => x.id === Number(id));
+  if (!n) return renderGenerica('Noticia no encontrada', 'La noticia que buscás no existe.');
+  return `
+    <div class="vista-detalle">
+      <a href="#/" class="volver">← Volver al inicio</a>
+      <div class="cat">${n.cat}</div>
+      <h1>${n.title}</h1>
+      <div class="fecha">${n.date}</div>
+      <img class="principal" src="${n.img}" alt="${n.title}"
+           onerror="this.src='https://picsum.photos/1200/675?random=${n.id}'">
+      <div class="cuerpo">
+        <p>Este es un demo.</p>
+        <p>Demo</p>
+        <p>Cada una de estas secciones sería alimentada por un CMS real y renderizada.</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderGenerica(titulo, descripcion) {
+  return `
+    <div class="vista-generica">
+      <h1>${titulo}</h1>
+      <p>${descripcion}</p>
+      <div class="placeholder-box">
+        Marcos Puto.
+      </div>
+    </div>
+  `;
+}
+
+/* =====================================================
+   BUSCADOR
+   ===================================================== */
+function filtrarNoticias(query) {
+  const grid = document.getElementById('noticiasGrid');
+  if (!grid) return;
+  const q = query.toLowerCase().trim();
+  const filtradas = q
+    ? noticias.filter(n =>
+        n.title.toLowerCase().includes(q) ||
+        n.cat.toLowerCase().includes(q))
+    : noticias;
+  grid.innerHTML = filtradas.length
+    ? filtradas.map(noticiaCardHTML).join('')
+    : '<p style="grid-column:1/-1;text-align:center;color:#797979;">No se encontraron resultados.</p>';
+}
+
+/* =====================================================
+   ROUTER
+   ===================================================== */
+function navigateTo(hash) {
+  if (window.location.hash === hash) {
+    renderRoute();
+  } else {
+    window.location.hash = hash;
+  }
+}
+
+function renderRoute() {
+  const hash = window.location.hash || '#/';
+  const app = document.getElementById('app');
+
+  document.querySelectorAll('.main-nav > ul > li').forEach(li => li.classList.remove('current-menu-item'));
+
+  if (hash.startsWith('#/noticia/')) {
+    const id = hash.split('/')[2];
+    app.innerHTML = renderNoticiaDetalle(id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  if (hash === '#/' || hash === '') {
+    app.innerHTML = renderHome();
+    document.querySelectorAll('.main-nav > ul > li').forEach(li => {
+      if (li.querySelector('a')?.textContent.trim() === 'Inicio') {
+        li.classList.add('current-menu-item');
+      }
+    });
+    attachSliderHover();
+    clearInterval(sliderTimer);
+    sliderCurrent = 0;
+    restartSliderAutoplay();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  const partes = hash.replace('#/', '').split('/');
+  const path = partes.map(p => decodeURIComponent(p));
+  const titulo = path.map(p => {
+    const label = encontrarLabel(menuItems, p);
+    return label || (p.charAt(0).toUpperCase() + p.slice(1).replace(/-/g, ' '));
+  }).join(' › ');
+
+  app.innerHTML = renderGenerica(titulo, 'Sección de demostración educativa.');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function encontrarLabel(items, key) {
+  for (const item of items) {
+    if (item.href) {
+      const slug = item.href.replace('#/', '').split('/').pop();
+      if (slug === key) return item.label;
+    }
+    if (item.children) {
+      const found = encontrarLabel(item.children, key);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+window.addEventListener('hashchange', renderRoute);
+window.addEventListener('DOMContentLoaded', renderRoute);
+if (document.readyState !== 'loading') renderRoute();
+</script>
+
+</body>
+</html>

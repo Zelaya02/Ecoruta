@@ -402,9 +402,13 @@
                     localStorage.setItem('nexo_rol', userRol);
                     btnText.textContent = 'Acceso concedido';
                     setTimeout(() => {
-                        if (userRol === 'superadmin') {
+                        const r = (userRol || '').toLowerCase();
+                        if (r === 'superadmin') {
                             window.location.href = 'admin.html';
+                        } else if (r === 'ciudadano') {
+                            window.location.href = 'ciudadano.html';
                         } else {
+                            // admin y gestor comparten el panel de rutas + denuncias
                             window.location.href = 'index.html';
                         }
                     }, 600);

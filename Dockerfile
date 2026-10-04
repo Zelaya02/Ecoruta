@@ -17,8 +17,9 @@ WORKDIR /app
 # Copy the compiled fat jar from Stage 1
 COPY --from=build /build/backend/target/ruteo-backend-1.0.0-jar-with-dependencies.jar ./app.jar
 
-# Copy the static frontend files
+# Copy the static frontend files (+ portal municipal como puerta de entrada)
 COPY frontend ./frontend
+COPY muni-demo ./frontend/muni-demo
 
 # Copy the database SQL file for auto-loading if needed
 COPY database/import.sql ./database/import.sql

@@ -224,6 +224,39 @@ public class Main {
             try { stmt.executeUpdate("ALTER TABLE entregas ADD CONSTRAINT fk_entregas_ruta FOREIGN KEY (ruta_token) REFERENCES rutas_generadas(token) ON DELETE CASCADE"); } catch (SQLException ignored) {}
             try { stmt.executeUpdate("ALTER TABLE entregas ADD CONSTRAINT fk_entregas_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE"); } catch (SQLException ignored) {}
 
+            // ---- Usuarios por rol unificado (idempotente) ----
+            try {
+                stmt.executeUpdate("INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('gestor', 'gestor2026', 'Gestor de Rutas y Denuncias', 'gestor', true) ON CONFLICT (username) DO NOTHING");
+                stmt.executeUpdate("INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('ciudadano', 'ciudadano2026', 'Ciudadano Demo', 'ciudadano', true) ON CONFLICT (username) DO NOTHING");
+            } catch (SQLException ignored) {}
+
+            // ---- Tabla denuncias ciudadanas (port recoleccion-basura-app) ----
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS denuncias (" +
+                    "id SERIAL PRIMARY KEY, " +
+                    "ticket TEXT UNIQUE NOT NULL, " +
+                    "nombre_ciudadano TEXT, " +
+                    "telefono TEXT, " +
+                    "descripcion TEXT NOT NULL, " +
+                    "categoria TEXT DEFAULT 'VERTEDERO_CLANDESTINO', " +
+                    "barrio TEXT NOT NULL, " +
+                    "direccion_referencia TEXT, " +
+                    "latitud DOUBLE PRECISION NOT NULL, " +
+                    "longitud DOUBLE PRECISION NOT NULL, " +
+                    "foto_url TEXT, " +
+                    "estado TEXT DEFAULT 'pendiente', " +
+                    "usuario_id INTEGER, " +
+                    "cliente_id INTEGER, " +
+                    "ruta_token TEXT, " +
+                    "observacion_cierre TEXT, " +
+                    "fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                    "fecha_cierre TIMESTAMP)");
+            try { stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_denuncias_estado ON denuncias(estado)"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_denuncias_barrio ON denuncias(barrio)"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_denuncias_ticket ON denuncias(ticket)"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE denuncias ADD CONSTRAINT fk_denuncias_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE denuncias ADD CONSTRAINT fk_denuncias_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE denuncias ADD CONSTRAINT fk_denuncias_ruta FOREIGN KEY (ruta_token) REFERENCES rutas_generadas(token) ON DELETE SET NULL"); } catch (SQLException ignored) {}
+
             System.out.println("✅ Esquema de base de datos verificado/creado con relaciones.");
             
             ResultSet rsClientes = stmt.executeQuery("SELECT COUNT(*) FROM clientes");
@@ -334,6 +367,7 @@ public class Main {
         server.createContext("/api/kml/importar", new KmlImportHandler());
         server.createContext("/api/kml/exportar", new KmlExportHandler());
         server.createContext("/api/admin/usuarios", new AdminUsuariosHandler());
+        server.createContext("/api/denuncias", new DenunciasHandler());
 
         server.setExecutor(null);
         server.start();
@@ -341,25 +375,48 @@ public class Main {
         System.out.println("Presiona Ctrl+C para detener");
     }
 
+    /** Resuelve un archivo estatico: 1) dentro de FRONTEND_DIR, 2) muni-demo
+     *  hermano del frontend (layout del repo en desarrollo local). Devuelve
+     *  null si queda fuera de las raices permitidas. */
+    private static File resolveStaticFile(String path) throws IOException {
+        String rel = path.startsWith("/") ? path.substring(1) : path;
+        File frontendRoot = new File(FRONTEND_DIR).getCanonicalFile();
+        File candidate = new File(frontendRoot, rel);
+        boolean inFrontend = candidate.getCanonicalPath().startsWith(frontendRoot.getCanonicalPath());
+        if (inFrontend && candidate.exists()) {
+            return candidate;
+        }
+        if (rel.startsWith("muni-demo/")) {
+            File repoSibling = new File(frontendRoot.getParentFile(), rel).getCanonicalFile();
+            File repoRoot = frontendRoot.getParentFile().getCanonicalFile();
+            if (repoSibling.getCanonicalPath().startsWith(repoRoot.getCanonicalPath()) && repoSibling.exists()) {
+                return repoSibling;
+            }
+        }
+        return inFrontend ? candidate : null;
+    }
+
     static class StaticHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String path = exchange.getRequestURI().getPath();
             if (path.equals("/")) {
-                path = "/index.html";
+                // Puerta de entrada: portal municipal (muni-demo). Si no existe
+                // (desarrollo local sin copiar), cae al panel como antes.
+                File portal = resolveStaticFile("/muni-demo/index.html");
+                path = (portal != null && portal.exists()) ? "/muni-demo/index.html" : "/index.html";
             }
             path = path.replaceAll("\\.\\./", "").replaceAll("\\.\\.", "").replaceAll("//+", "/");
             if (path.contains("..") || path.contains("%") || path.contains(":") || path.contains("~")) {
                 exchange.sendResponseHeaders(403, -1);
                 return;
             }
-            File file = new File(FRONTEND_DIR, path);
-            String canonicalPath = file.getCanonicalPath();
-            String frontendCanonical = new File(FRONTEND_DIR).getCanonicalPath();
-            if (!canonicalPath.startsWith(frontendCanonical)) {
+            File file = resolveStaticFile(path);
+            if (file == null) {
                 exchange.sendResponseHeaders(403, -1);
                 return;
             }
+            String canonicalPath = file.getCanonicalPath();
             if (file.exists() && !file.isDirectory()) {
                 String contentType = "text/html";
                 if (path.endsWith(".css"))
@@ -368,6 +425,14 @@ public class Main {
                     contentType = "application/javascript";
                 else if (path.endsWith(".png"))
                     contentType = "image/png";
+                else if (path.endsWith(".jpg") || path.endsWith(".jpeg"))
+                    contentType = "image/jpeg";
+                else if (path.endsWith(".gif"))
+                    contentType = "image/gif";
+                else if (path.endsWith(".svg"))
+                    contentType = "image/svg+xml";
+                else if (path.endsWith(".ico"))
+                    contentType = "image/x-icon";
 
                 exchange.getResponseHeaders().set("Content-Type", contentType);
                 exchange.sendResponseHeaders(200, file.length());
@@ -456,7 +521,7 @@ public class Main {
 
                     try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                         if ("POST".equals(exchange.getRequestMethod())) {
-                            String sql = "INSERT INTO clientes (nombre, tipo_cliente, latitud, longitud, ciudad, cadena, activo, usuario_id) VALUES (?, ?, ?, ?, ?, ?, true, ?)";
+                            String sql = "INSERT INTO clientes (nombre, tipo_cliente, latitud, longitud, ciudad, cadena, activo, usuario_id) VALUES (?, ?, ?, ?, ?, ?, true, ?) RETURNING id";
                             PreparedStatement pstmt = conn.prepareStatement(sql);
                             pstmt.setString(1, nombre);
                             pstmt.setString(2, tipo);
@@ -465,8 +530,12 @@ public class Main {
                             pstmt.setString(5, ciudad);
                             pstmt.setString(6, cadena);
                             pstmt.setInt(7, userId);
-                            pstmt.executeUpdate();
-                            sendResponse(exchange, 201, "{\"status\":\"created\"}");
+                            ResultSet rsId = pstmt.executeQuery();
+                            int newId = rsId.next() ? rsId.getInt(1) : 0;
+                            Map<String, Object> respCli = new HashMap<>();
+                            respCli.put("status", "created");
+                            respCli.put("id", newId);
+                            sendResponse(exchange, 201, gson.toJson(respCli));
                         } else {
                             int id = ((Double) req.get("id")).intValue();
                             String sql = "UPDATE clientes SET nombre=?, tipo_cliente=?, latitud=?, longitud=?, ciudad=?, cadena=? WHERE id=? AND usuario_id=?";
@@ -718,6 +787,22 @@ public class Main {
                                 pstmt2.executeUpdate();
                             }
 
+                            // Conexion denuncias -> ruta: si un punto de la ruta viene de una
+                            // denuncia pendiente, pasa a en_proceso y queda vinculada al token.
+                            // Tambien cubre denuncias del mismo barrio ya validadas como cliente.
+                            try {
+                                List<Integer> idsRuta = ordenados.stream().map(c -> c.id).collect(Collectors.toList());
+                                String ph = idsRuta.stream().map(x -> "?").collect(Collectors.joining(","));
+                                String sqlDen = "UPDATE denuncias SET estado = 'en_proceso', ruta_token = ? WHERE cliente_id IN (" + ph + ") AND estado IN ('pendiente', 'en_proceso') AND (ruta_token IS NULL OR ruta_token = '')";
+                                PreparedStatement pDen = conn.prepareStatement(sqlDen);
+                                pDen.setString(1, token);
+                                for (int k = 0; k < idsRuta.size(); k++) pDen.setInt(k + 2, idsRuta.get(k));
+                                int nDen = pDen.executeUpdate();
+                                if (nDen > 0) System.out.println("📌 " + nDen + " denuncia(s) -> en_proceso por ruta " + token);
+                            } catch (Exception exDen) {
+                                System.err.println("⚠️ No se pudo vincular denuncias a ruta " + token + ": " + exDen.getMessage());
+                            }
+
                             Map<String, Object> movil = new HashMap<>();
                             movil.put("movil", i + 1);
                             movil.put("token", token);
@@ -857,6 +942,33 @@ public class Main {
                         pstmt.setString(3, token);
                         pstmt.setInt(4, clienteId);
                         pstmt.executeUpdate();
+
+                        // Cierre de denuncia cuando el chofer finaliza el punto:
+                        // entregado -> cerrada | rechazado -> en_proceso (reintento) con nota
+                        try {
+                            if ("entregado".equalsIgnoreCase(estado) || "resuelto".equalsIgnoreCase(estado)) {
+                                // El punto de ruta es 1:1 con la denuncia (se crea por denuncia),
+                                // por eso se matchea por cliente_id aunque el ruta_token no se haya
+                                // estampado (ej: gestor marco en_proceso antes de generar la ruta).
+                                String sqlC = "UPDATE denuncias SET estado = 'cerrada', ruta_token = ?, fecha_cierre = CURRENT_TIMESTAMP, observacion_cierre = ? WHERE cliente_id = ? AND estado IN ('pendiente','en_proceso') AND (ruta_token = ? OR ruta_token IS NULL OR ruta_token = '')";
+                                PreparedStatement pC = conn.prepareStatement(sqlC);
+                                pC.setString(1, token);
+                                pC.setString(2, observacion != null ? observacion : "");
+                                pC.setInt(3, clienteId);
+                                pC.setString(4, token);
+                                int n = pC.executeUpdate();
+                                if (n > 0) System.out.println("✅ " + n + " denuncia(s) cerrada(s) por punto " + clienteId + " ruta " + token);
+                            } else if ("rechazado".equalsIgnoreCase(estado)) {
+                                String sqlR = "UPDATE denuncias SET estado = 'en_proceso', observacion_cierre = ? WHERE cliente_id = ? AND estado IN ('pendiente','en_proceso') AND (ruta_token = ? OR ruta_token IS NULL OR ruta_token = '')";
+                                PreparedStatement pR = conn.prepareStatement(sqlR);
+                                pR.setString(1, observacion != null ? observacion : "Rechazado en punto de ruta");
+                                pR.setInt(2, clienteId);
+                                pR.setString(3, token);
+                                pR.executeUpdate();
+                            }
+                        } catch (Exception exDen) {
+                            System.err.println("⚠️ No se pudo actualizar denuncia vinculada: " + exDen.getMessage());
+                        }
                         sendResponse(exchange, 200, "{\"status\":\"ok\"}");
                     }
                 } catch (Exception e) {
@@ -1477,6 +1589,223 @@ String dateFilter = switch (periodo) {
         }
     }
 
+    static class DenunciasHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            setCORS(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            String method = exchange.getRequestMethod();
+            try {
+                if ("GET".equals(method)) {
+                    handleList(exchange);
+                } else if ("POST".equals(method)) {
+                    handleCreate(exchange);
+                } else if ("PUT".equals(method)) {
+                    handleUpdate(exchange);
+                } else {
+                    exchange.sendResponseHeaders(405, -1);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                sendError(exchange, 500, "Error interno en denuncias");
+            }
+        }
+
+        private Map<String, String> queryParams(HttpExchange exchange) {
+            Map<String, String> map = new HashMap<>();
+            String q = exchange.getRequestURI().getRawQuery();
+            if (q == null) return map;
+            for (String p : q.split("&")) {
+                int i = p.indexOf('=');
+                if (i > 0) {
+                    try {
+                        map.put(java.net.URLDecoder.decode(p.substring(0, i), "UTF-8"),
+                                java.net.URLDecoder.decode(p.substring(i + 1), "UTF-8"));
+                    } catch (Exception ignored) {}
+                }
+            }
+            return map;
+        }
+
+        private Map<String, Object> rowToMap(ResultSet rs) throws SQLException {
+            Map<String, Object> d = new HashMap<>();
+            d.put("id", rs.getInt("id"));
+            d.put("ticket", rs.getString("ticket"));
+            d.put("nombre_ciudadano", rs.getString("nombre_ciudadano"));
+            d.put("telefono", rs.getString("telefono"));
+            d.put("descripcion", rs.getString("descripcion"));
+            d.put("categoria", rs.getString("categoria"));
+            d.put("barrio", rs.getString("barrio"));
+            d.put("direccion_referencia", rs.getString("direccion_referencia"));
+            d.put("latitud", rs.getDouble("latitud"));
+            d.put("longitud", rs.getDouble("longitud"));
+            d.put("foto_url", rs.getString("foto_url"));
+            d.put("estado", rs.getString("estado"));
+            d.put("usuario_id", rs.getObject("usuario_id"));
+            d.put("cliente_id", rs.getObject("cliente_id"));
+            d.put("ruta_token", rs.getString("ruta_token"));
+            d.put("observacion_cierre", rs.getString("observacion_cierre"));
+            d.put("fecha_creacion", rs.getTimestamp("fecha_creacion") != null ? rs.getTimestamp("fecha_creacion").toString() : null);
+            d.put("fecha_cierre", rs.getTimestamp("fecha_cierre") != null ? rs.getTimestamp("fecha_cierre").toString() : null);
+            return d;
+        }
+
+        /** GET /api/denuncias?ticket=ECO-... (publico) | ?estado=&barrio=&mine=1 (auth) */
+        private void handleList(HttpExchange exchange) throws IOException, SQLException {
+            Map<String, String> qp = queryParams(exchange);
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                if (qp.containsKey("ticket") && !qp.get("ticket").isEmpty()) {
+                    PreparedStatement ps = conn.prepareStatement("SELECT * FROM denuncias WHERE ticket = ?");
+                    ps.setString(1, qp.get("ticket").trim().toUpperCase());
+                    ResultSet rs = ps.executeQuery();
+                    if (rs.next()) {
+                        Map<String, Object> d = rowToMap(rs);
+                        // Vista publica sanitizada: sin telefono ni usuario_id
+                        d.remove("telefono");
+                        d.remove("usuario_id");
+                        sendResponse(exchange, 200, gson.toJson(d));
+                    } else {
+                        sendError(exchange, 404, "Ticket no encontrado");
+                    }
+                    return;
+                }
+                if (!isAuthorized(exchange)) { sendError(exchange, 401, "No autorizado"); return; }
+                Integer userId = getUserIdFromSession(exchange);
+                String rol = getRolFromSession(exchange);
+                boolean manager = canManageRutas(exchange);
+                StringBuilder sql = new StringBuilder("SELECT * FROM denuncias WHERE 1=1");
+                List<Object> params = new ArrayList<>();
+                if (!manager) {
+                    sql.append(" AND usuario_id = ?");
+                    params.add(userId);
+                } else if ("1".equals(qp.get("mine"))) {
+                    sql.append(" AND usuario_id = ?");
+                    params.add(userId);
+                }
+                if (qp.containsKey("estado") && !qp.get("estado").isEmpty() && !"todos".equalsIgnoreCase(qp.get("estado"))) {
+                    sql.append(" AND estado = ?");
+                    params.add(qp.get("estado").toLowerCase());
+                }
+                if (qp.containsKey("barrio") && !qp.get("barrio").isEmpty()) {
+                    sql.append(" AND barrio ILIKE ?");
+                    params.add("%" + qp.get("barrio") + "%");
+                }
+                sql.append(" ORDER BY fecha_creacion DESC LIMIT 300");
+                PreparedStatement ps = conn.prepareStatement(sql.toString());
+                for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
+                ResultSet rs = ps.executeQuery();
+                List<Map<String, Object>> out = new ArrayList<>();
+                while (rs.next()) out.add(rowToMap(rs));
+                sendResponse(exchange, 200, gson.toJson(out));
+            }
+        }
+
+        /** POST /api/denuncias (auth: ciudadano/gestor/admin/superadmin) -> pendiente */
+        private void handleCreate(HttpExchange exchange) throws IOException, SQLException {
+            if (!isAuthorized(exchange)) { sendError(exchange, 401, "No autorizado"); return; }
+            Integer userId = getUserIdFromSession(exchange);
+            String body = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
+                    .lines().collect(Collectors.joining("\n"));
+            JsonObject json;
+            try {
+                json = JsonParser.parseString(body).getAsJsonObject();
+            } catch (Exception e) { sendError(exchange, 400, "JSON invalido"); return; }
+            String descripcion = json.has("descripcion") ? json.get("descripcion").getAsString().trim() : "";
+            String barrio = json.has("barrio") ? json.get("barrio").getAsString().trim() : "";
+            if (descripcion.isEmpty() || barrio.isEmpty()) { sendError(exchange, 400, "descripcion y barrio son obligatorios"); return; }
+            if (!json.has("latitud") || !json.has("longitud")) { sendError(exchange, 400, "latitud y longitud son obligatorias"); return; }
+            double lat = json.get("latitud").getAsDouble();
+            double lon = json.get("longitud").getAsDouble();
+            String categoria = json.has("categoria") ? json.get("categoria").getAsString() : "VERTEDERO_CLANDESTINO";
+            String direccion = json.has("direccion_referencia") ? json.get("direccion_referencia").getAsString() : "";
+            String telefono = json.has("telefono") ? json.get("telefono").getAsString() : "";
+            String nombre = json.has("nombre_ciudadano") ? json.get("nombre_ciudadano").getAsString() : "";
+            String foto = json.has("foto_url") ? json.get("foto_url").getAsString() : "";
+            String fecha = new java.text.SimpleDateFormat("yyyyMMdd").format(new java.util.Date());
+            String ticket = "ECO-" + fecha + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO denuncias (ticket, nombre_ciudadano, telefono, descripcion, categoria, barrio, direccion_referencia, latitud, longitud, foto_url, estado, usuario_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?) RETURNING id");
+                ps.setString(1, ticket);
+                ps.setString(2, nombre);
+                ps.setString(3, telefono);
+                ps.setString(4, descripcion);
+                ps.setString(5, categoria);
+                ps.setString(6, barrio);
+                ps.setString(7, direccion);
+                ps.setDouble(8, lat);
+                ps.setDouble(9, lon);
+                ps.setString(10, foto);
+                ps.setInt(11, userId);
+                ResultSet rs = ps.executeQuery();
+                int id = rs.next() ? rs.getInt(1) : 0;
+                Map<String, Object> resp = new HashMap<>();
+                resp.put("id", id);
+                resp.put("ticket", ticket);
+                resp.put("estado", "pendiente");
+                sendResponse(exchange, 201, gson.toJson(resp));
+            }
+        }
+
+        /** PUT /api/denuncias (solo gestor/admin/superadmin): cambia estado y vincula cliente/ruta */
+        private void handleUpdate(HttpExchange exchange) throws IOException, SQLException {
+            if (!isAuthorized(exchange)) { sendError(exchange, 401, "No autorizado"); return; }
+            if (!canManageRutas(exchange)) { sendError(exchange, 403, "Solo gestor o superior"); return; }
+            String body = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
+                    .lines().collect(Collectors.joining("\n"));
+            JsonObject json;
+            try {
+                json = JsonParser.parseString(body).getAsJsonObject();
+            } catch (Exception e) { sendError(exchange, 400, "JSON invalido"); return; }
+            if (!json.has("id")) { sendError(exchange, 400, "id requerido"); return; }
+            int id = json.get("id").getAsInt();
+            String nuevoEstado = json.has("estado") ? json.get("estado").getAsString().toLowerCase() : null;
+            if (nuevoEstado == null || (!nuevoEstado.equals("pendiente") && !nuevoEstado.equals("en_proceso")
+                    && !nuevoEstado.equals("cerrada") && !nuevoEstado.equals("rechazada"))) {
+                sendError(exchange, 400, "estado invalido (pendiente|en_proceso|cerrada|rechazada)");
+                return;
+            }
+            Integer clienteId = (json.has("cliente_id") && !json.get("cliente_id").isJsonNull()) ? json.get("cliente_id").getAsInt() : null;
+            String rutaToken = (json.has("ruta_token") && !json.get("ruta_token").isJsonNull()) ? json.get("ruta_token").getAsString() : null;
+            String obs = (json.has("observacion_cierre") && !json.get("observacion_cierre").isJsonNull()) ? json.get("observacion_cierre").getAsString() : "";
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                PreparedStatement cur = conn.prepareStatement("SELECT estado FROM denuncias WHERE id = ?");
+                cur.setInt(1, id);
+                ResultSet rs = cur.executeQuery();
+                if (!rs.next()) { sendError(exchange, 404, "Denuncia no encontrada"); return; }
+                String actual = rs.getString("estado");
+                if ("cerrada".equals(actual) && "cerrada".equals(nuevoEstado)) { sendError(exchange, 400, "La denuncia ya esta cerrada"); return; }
+                // Transiciones validas: pendiente->en_proceso|rechazada, en_proceso->cerrada|rechazada|pendiente, rechazada->pendiente|en_proceso, cerrada->en_proceso (reapertura)
+                boolean ok = ("pendiente".equals(actual) && ("en_proceso".equals(nuevoEstado) || "rechazada".equals(nuevoEstado)))
+                        || ("en_proceso".equals(actual) && ("cerrada".equals(nuevoEstado) || "rechazada".equals(nuevoEstado) || "pendiente".equals(nuevoEstado)))
+                        || ("rechazada".equals(actual) && ("pendiente".equals(nuevoEstado) || "en_proceso".equals(nuevoEstado)))
+                        || ("cerrada".equals(actual) && "en_proceso".equals(nuevoEstado));
+                if (!ok) { sendError(exchange, 400, "Transicion no permitida: " + actual + " -> " + nuevoEstado); return; }
+                String sql;
+                if ("cerrada".equals(nuevoEstado)) {
+                    sql = "UPDATE denuncias SET estado = ?, observacion_cierre = ?, fecha_cierre = CURRENT_TIMESTAMP"
+                            + (clienteId != null ? ", cliente_id = " + clienteId : "")
+                            + (rutaToken != null ? ", ruta_token = '" + rutaToken.replace("'", "''") + "'" : "")
+                            + " WHERE id = ?";
+                } else {
+                    sql = "UPDATE denuncias SET estado = ?, observacion_cierre = ?, fecha_cierre = NULL"
+                            + (clienteId != null ? ", cliente_id = " + clienteId : "")
+                            + (rutaToken != null ? ", ruta_token = '" + rutaToken.replace("'", "''") + "'" : "")
+                            + " WHERE id = ?";
+                }
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ps.setString(1, nuevoEstado);
+                ps.setString(2, obs);
+                ps.setInt(3, id);
+                ps.executeUpdate();
+                sendResponse(exchange, 200, "{\"status\":\"ok\",\"estado\":\"" + nuevoEstado + "\"}");
+            }
+        }
+    }
+
     static class HealthHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -1684,6 +2013,24 @@ String dateFilter = switch (periodo) {
             }
         }
         return null;
+    }
+
+    private static String getRolFromSession(HttpExchange exchange) {
+        List<String> authHeaders = exchange.getRequestHeaders().get("Authorization");
+        if (authHeaders == null || authHeaders.isEmpty()) return null;
+        String authHeader = authHeaders.get(0);
+        if (authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7).trim();
+            UserSession session = activeTokens.get(token);
+            if (session != null) return session.rol != null ? session.rol.toLowerCase() : "admin";
+        }
+        return null;
+    }
+
+    /** Gestor, admin y superadmin pueden administrar denuncias y rutas. */
+    private static boolean canManageRutas(HttpExchange exchange) {
+        String rol = getRolFromSession(exchange);
+        return rol != null && ("gestor".equals(rol) || "admin".equals(rol) || "superadmin".equals(rol));
     }
 
     /** Crea las categorías por defecto para un usuario si todavía no tiene ninguna definida. */

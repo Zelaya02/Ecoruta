@@ -15,9 +15,15 @@ CREATE TABLE IF NOT EXISTS usuarios (
 );
 
 -- Usuarios por defecto (idempotente)
+-- Roles unificados: superadmin (gestiona perfiles), gestor (rutas + denuncias, alias admin),
+-- ciudadano (crea/consulta denuncias), chofer (acceso por token de ruta)
 INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('admin', 'nexo2025', 'Administrador', 'admin', true)
     ON CONFLICT (username) DO NOTHING;
 INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('superadmin', 'supernexo2025', 'Super Administrador', 'superadmin', true)
+    ON CONFLICT (username) DO NOTHING;
+INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('gestor', 'gestor2026', 'Gestor de Rutas y Denuncias', 'gestor', true)
+    ON CONFLICT (username) DO NOTHING;
+INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('ciudadano', 'ciudadano2026', 'Ciudadano Demo', 'ciudadano', true)
     ON CONFLICT (username) DO NOTHING;
 
 -- --------------------------------------------------
@@ -112,3 +118,34 @@ CREATE TABLE IF NOT EXISTS entregas (
     orden_en_ruta INTEGER,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- --------------------------------------------------
+-- DENUNCIAS CIUDADANAS (port del repo recoleccion-basura-app)
+-- Estados: pendiente -> en_proceso -> cerrada | rechazada
+-- pendiente: creada por ciudadano. en_proceso: su barrio/cliente entro en ruta.
+-- cerrada: chofer finalizo el punto vinculado. rechazada: gestor la descarta.
+-- --------------------------------------------------
+CREATE TABLE IF NOT EXISTS denuncias (
+    id SERIAL PRIMARY KEY,
+    ticket TEXT UNIQUE NOT NULL,
+    nombre_ciudadano TEXT,
+    telefono TEXT,
+    descripcion TEXT NOT NULL,
+    categoria TEXT DEFAULT 'VERTEDERO_CLANDESTINO',
+    barrio TEXT NOT NULL,
+    direccion_referencia TEXT,
+    latitud DOUBLE PRECISION NOT NULL,
+    longitud DOUBLE PRECISION NOT NULL,
+    foto_url TEXT,
+    estado TEXT DEFAULT 'pendiente',
+    usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
+    ruta_token TEXT REFERENCES rutas_generadas(token) ON DELETE SET NULL,
+    observacion_cierre TEXT,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_cierre TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_denuncias_estado ON denuncias(estado);
+CREATE INDEX IF NOT EXISTS idx_denuncias_barrio ON denuncias(barrio);
+CREATE INDEX IF NOT EXISTS idx_denuncias_ticket ON denuncias(ticket);
+CREATE INDEX IF NOT EXISTS idx_denuncias_usuario ON denuncias(usuario_id);

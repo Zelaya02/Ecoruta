@@ -6,12 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>
         const token = localStorage.getItem('nexo_token');
-        const rol = localStorage.getItem('nexo_rol');
+        const rol = (localStorage.getItem('nexo_rol') || 'admin').toLowerCase();
         if (!token) {
             window.location.href = 'login.html';
         } else if (rol === 'superadmin') {
             window.location.href = 'admin.html';
+        } else if (rol === 'ciudadano') {
+            window.location.href = 'ciudadano.html';
         }
+        // gestor y admin comparten este panel: rutas + denuncias
 
         if (localStorage.getItem('darkMode') === 'enabled') {
             document.documentElement.classList.add('dark-mode');
@@ -829,6 +832,7 @@
             </div>
             <div class="header-actions">
                 <button class="btn-glass" onclick="window.location.href='estadisticas.html'"><i class="fas fa-chart-bar"></i> Estadísticas</button>
+                <button class="btn-glass" onclick="togglePanelDenuncias()"><i class="fas fa-exclamation-triangle"></i> Denuncias</button>
                 <button class="btn-glass" onclick="abrirModalKml()"><i class="fas fa-upload"></i> Importar / KML</button>
                 <button class="btn-glass" onclick="exportarKml()"><i class="fas fa-download"></i> Exportar / KML</button>
                 <button class="btn-glass" onclick="toggleConfig()"><i class="fas fa-cog"></i> Configuración</button>
@@ -868,6 +872,31 @@
                     <button class="btn-secondary-outline" onclick="abrirModalCategorias()" style="flex:1;"><i class="fas fa-tags"></i> Categorías</button>
                     <button class="btn-secondary-outline" onclick="abrirModalTransportes()" style="flex:1;"><i class="fas fa-truck"></i> Transportes (Choferes/Vehículos)</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Panel Denuncias (gestor: ve y gestiona reportes ciudadanos por barrio) -->
+        <div id="panelDenuncias" style="display:none; background:var(--card-light); border-radius:24px; padding:24px; margin-bottom:24px; border:var(--card-border); box-shadow:var(--card-shadow);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:12px; flex-wrap:wrap;">
+                <h3 style="margin:0;"><i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> Denuncias ciudadanas</h3>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <select id="filtroDenEstado" class="select-filter" onchange="cargarDenuncias()">
+                        <option value="todos">Todos los estados</option>
+                        <option value="pendiente" selected>Pendientes</option>
+                        <option value="en_proceso">En proceso</option>
+                        <option value="cerrada">Cerradas</option>
+                        <option value="rechazada">Rechazadas</option>
+                    </select>
+                    <input type="text" id="filtroDenBarrio" class="search-input" placeholder="Filtrar por barrio..." oninput="cargarDenuncias()" style="max-width:220px;">
+                    <button class="btn-icon" onclick="togglePanelDenuncias()"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <p style="font-size:12px; color:var(--text-muted-light); margin:0 0 12px;">Flujo: <b>pendiente</b> (ciudadano reporta) → <b>en_proceso</b> (el barrio entra en ruta / se crea punto) → <b>cerrada</b> (el chofer finaliza el punto). Acciones permitidas según ese flujo.</p>
+            <div class="table-wrapper" style="max-height:380px; overflow:auto;">
+                <table class="client-table">
+                    <thead><tr><th>Ticket</th><th>Barrio</th><th>Descripción</th><th>Estado</th><th style="min-width:280px;">Acciones</th></tr></thead>
+                    <tbody id="cuerpoDenuncias"><tr><td colspan="5" style="text-align:center; padding:24px;">Abre el panel para cargar denuncias...</td></tr></tbody>
+                </table>
             </div>
         </div>
 
@@ -1321,6 +1350,71 @@
             const response = await fetch(url, options);
             if (response.status === 401) { alert("Sesión expirada"); window.location.href = 'login.html'; }
             return response;
+        }
+
+        // ========== DENUNCIAS (gestor) ==========
+        function togglePanelDenuncias() {
+            const p = document.getElementById('panelDenuncias');
+            const visible = p.style.display !== 'none';
+            p.style.display = visible ? 'none' : 'block';
+            if (!visible) cargarDenuncias();
+        }
+        function badgeEstadoDen(e) {
+            const m = { pendiente: 'background:#fef3c7;color:#92400e;', en_proceso: 'background:#dbeafe;color:#1e40af;', cerrada: 'background:#d1fae5;color:#065f46;', rechazada: 'background:#fee2e2;color:#991b1b;' };
+            return `<span style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;${m[e] || ''}">${e}</span>`;
+        }
+        async function cargarDenuncias() {
+            const tbody = document.getElementById('cuerpoDenuncias');
+            const estado = document.getElementById('filtroDenEstado').value;
+            const barrio = document.getElementById('filtroDenBarrio').value.trim();
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;"><i class="fas fa-spinner fa-spin"></i> Cargando denuncias...</td></tr>';
+            try {
+                let url = '/api/denuncias?estado=' + encodeURIComponent(estado);
+                if (barrio) url += '&barrio=' + encodeURIComponent(barrio);
+                const res = await fetchWithAuth(url);
+                const data = await res.json();
+                if (!Array.isArray(data) || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">Sin denuncias para este filtro.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map(d => {
+                    const desc = (d.descripcion || '').replace(/</g, '&lt;').slice(0, 90);
+                    const bar = (d.barrio || '').replace(/</g, '&lt;');
+                    return `<tr>
+                        <td><b>${d.ticket}</b><br><span style="font-size:11px;color:var(--text-muted-light);">${d.categoria || ''}</span></td>
+                        <td>${bar}${d.ruta_token ? `<br><span style="font-size:11px;">🚚 ${d.ruta_token}</span>` : ''}</td>
+                        <td style="font-size:12px;">${desc}</td>
+                        <td>${badgeEstadoDen(d.estado)}</td>
+                        <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
+                            ${d.estado === 'pendiente' ? `<button class="btn-secondary-outline" style="font-size:11px;padding:6px 10px;" onclick="accionDenuncia(${d.id},'en_proceso')">▶ En proceso</button>` : ''}
+                            ${d.estado !== 'cerrada' ? `<button class="btn-secondary-outline" style="font-size:11px;padding:6px 10px;" onclick="accionDenuncia(${d.id},'cerrada')">✔ Cerrar</button>` : ''}
+                            ${d.estado === 'pendiente' || d.estado === 'en_proceso' ? `<button class="btn-secondary-outline" style="font-size:11px;padding:6px 10px;" onclick="accionDenuncia(${d.id},'rechazada')">✖ Rechazar</button>` : ''}
+                            ${!d.cliente_id ? `<button class="btn-primary" style="font-size:11px;padding:6px 10px;" onclick='crearClienteDesdeDenuncia(${JSON.stringify(d).replace(/'/g, "&#39;")})'>＋ Punto de ruta</button>` : `<span style="font-size:11px;">📍 cliente #${d.cliente_id}</span>`}
+                        </div></td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">Error cargando denuncias.</td></tr>';
+            }
+        }
+        async function accionDenuncia(id, estado) {
+            const obs = estado === 'cerrada' || estado === 'rechazada' ? (prompt('Observación (opcional):') || '') : '';
+            const res = await fetchWithAuth('/api/denuncias', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, estado, observacion_cierre: obs }) });
+            if (!res.ok) { const t = await res.text(); alert('No se pudo actualizar: ' + t); return; }
+            cargarDenuncias();
+        }
+        async function crearClienteDesdeDenuncia(d) {
+            const nombre = prompt('Nombre del punto de ruta:', 'Denuncia ' + d.ticket + ' - ' + d.barrio);
+            if (!nombre) return;
+            const res = await fetchWithAuth('/api/clientes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre, tipo_cliente: 'denuncia', latitud: d.latitud, longitud: d.longitud, ciudad: d.barrio, cadena: d.barrio }) });
+            if (!res.ok) { alert('No se pudo crear el punto de ruta'); return; }
+            const cli = await res.json();
+            const clienteId = cli.id || (cli.cliente && cli.cliente.id);
+            if (!clienteId) { alert('Punto creado, recarga clientes'); if (typeof cargarClientes === 'function') cargarClientes(); return; }
+            await fetchWithAuth('/api/denuncias', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id, estado: 'en_proceso', cliente_id: clienteId, observacion_cierre: 'Punto de ruta #' + clienteId + ' creado por gestor' }) });
+            alert('Punto #' + clienteId + ' creado y denuncia en proceso. Inclúyelo al generar la ruta del barrio.');
+            if (typeof cargarClientes === 'function') cargarClientes();
+            cargarDenuncias();
         }
 
         async function cargarClientes() {

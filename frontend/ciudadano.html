@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+    const token = localStorage.getItem('nexo_token');
+    const rol = (localStorage.getItem('nexo_rol') || '').toLowerCase();
+    if (!token) { window.location.href = 'login.html'; }
+    else if (rol === 'superadmin') { window.location.href = 'admin.html'; }
+</script>
+<title>EcoRuta · Portal Ciudadano</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+    .ciu-wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+    .ciu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .ciu-grid { grid-template-columns: 1fr; } }
+    .ciu-card { background: var(--card-light); border: var(--card-border); border-radius: 20px; padding: 22px; box-shadow: var(--card-shadow); }
+    .ciu-card h3 { margin: 0 0 14px; }
+    .control-input, .select-filter, .search-input { width: 100%; box-sizing: border-box; margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-light); background: var(--input-bg); color: var(--text-light); font-size: 13px; }
+    textarea.control-input { min-height: 90px; resize: vertical; }
+    #mapDenuncia { height: 300px; border-radius: 14px; margin-bottom: 12px; z-index: 1; }
+    .ticket-box { background: #d1fae5; color: #065f46; border-radius: 12px; padding: 12px 16px; font-weight: 700; margin-top: 12px; display: none; }
+    .badge { padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .b-pendiente { background: #fef3c7; color: #92400e; } .b-en_proceso { background: #dbeafe; color: #1e40af; }
+    .b-cerrada { background: #d1fae5; color: #065f46; } .b-rechazada { background: #fee2e2; color: #991b1b; }
+    .den-item { border-bottom: 1px solid var(--border-light); padding: 12px 0; font-size: 13px; }
+    .flow { font-size: 12px; color: var(--text-muted-light); }
+</style>
+</head>
+<body>
+<div class="header"><div class="header-content">
+    <div class="logo-area"><div class="logo-icon"><i class="fas fa-leaf"></i></div>
+        <div><h1>EcoRuta Ciudadano</h1><p>Denuncias de recolección · Asunción</p></div></div>
+    <div class="header-actions">
+        <span id="lblUser" style="font-size:13px;"></span>
+        <button class="btn-glass" onclick="logout()" style="color:var(--danger);"><i class="fas fa-sign-out-alt"></i> Salir</button>
+    </div>
+</div></div>
+
+<div class="ciu-wrap">
+    <p class="flow">Ciclo de tu denuncia: <b>pendiente</b> (la creas) → <b>en_proceso</b> (tu barrio entra en una ruta de recolección) → <b>cerrada</b> (el chofer finaliza el punto). Guarda tu ticket para consultar el estado.</p>
+    <div class="ciu-grid">
+        <div class="ciu-card">
+            <h3><i class="fas fa-plus-circle"></i> Nueva denuncia</h3>
+            <input id="fNombre" class="control-input" placeholder="Tu nombre (opcional)">
+            <input id="fTelefono" class="control-input" placeholder="Teléfono (opcional)">
+            <select id="fCategoria" class="select-filter">
+                <option value="VERTEDERO_CLANDESTINO">Vertedero clandestino</option>
+                <option value="RECOLECCION_PENDIENTE">Recolección pendiente</option>
+                <option value="CONTENEDOR_DANADO">Contenedor dañado</option>
+                <option value="OTROS">Otros</option>
+            </select>
+            <input id="fBarrio" class="control-input" list="listaBarrios" placeholder="Barrio * (ej: Sajonia)" required>
+            <datalist id="listaBarrios"></datalist>
+            <input id="fDireccion" class="control-input" placeholder="Referencia de dirección (ej: Av. Carlos A. López y Cnel. Gracia)">
+            <textarea id="fDescripcion" class="control-input" placeholder="Describe el problema *"></textarea>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <input id="fLat" class="control-input" placeholder="Latitud *" readonly>
+                <input id="fLon" class="control-input" placeholder="Longitud *" readonly>
+            </div>
+            <div id="mapDenuncia"></div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <button class="btn-secondary-outline" onclick="usarMiUbicacion()"><i class="fas fa-location-arrow"></i> Mi ubicación</button>
+                <span style="font-size:11px;color:var(--text-muted-light);align-self:center;">o haz clic en el mapa para marcar el punto</span>
+            </div>
+            <input id="fFoto" class="control-input" placeholder="URL de foto (opcional)">
+            <button class="btn-primary" onclick="crearDenuncia()" id="btnCrear" style="width:100%;justify-content:center;"><i class="fas fa-paper-plane"></i> Enviar denuncia</button>
+            <div id="ticketBox" class="ticket-box"></div>
+        </div>
+        <div class="ciu-card">
+            <h3><i class="fas fa-search"></i> Consultar por ticket</h3>
+            <div style="display:flex;gap:8px;">
+                <input id="qTicket" class="search-input" placeholder="Ej: ECO-20240101-AB12">
+                <button class="btn-secondary-outline" onclick="buscarTicket()">Buscar</button>
+            </div>
+            <div id="ticketResult" style="margin-top:8px;"></div>
+            <hr style="margin:18px 0;border:none;border-top:1px solid var(--border-light);">
+            <h3><i class="fas fa-list"></i> Mis denuncias</h3>
+            <button class="btn-secondary-outline" onclick="cargarMias()" style="margin-bottom:10px;"><i class="fas fa-sync"></i> Actualizar</button>
+            <div id="listaMias"><p class="flow">Cargando...</p></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const BARRIOS = ["Sajonia","Vista Alegre","Centro Histórico","Villa Morra","Recoleta","San Roque","La Encarnación","Catedral","Tacumbú","Obrero","Nazareth","Hipódromo","Pinozá","San Pablo","Trinidad","Zeballos Cué","Botánico","Loma Pytá","Salvador del Mundo","Santa María"];
+document.getElementById('listaBarrios').innerHTML = BARRIOS.map(b => `<option value="${b}">`).join('');
+document.getElementById('lblUser').textContent = localStorage.getItem('nexo_user') || '';
+function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+async function fetchAuth(url, options = {}) {
+    const t = localStorage.getItem('nexo_token');
+    options.headers = Object.assign({}, options.headers, { 'Authorization': 'Bearer ' + t });
+    const r = await fetch(url, options);
+    if (r.status === 401) { alert('Sesión expirada'); window.location.href = 'login.html'; throw new Error('401'); }
+    return r;
+}
+// Mapa
+const map = L.map('mapDenuncia').setView([-25.296, -57.636], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+let marker = null;
+function setPunto(lat, lon) {
+    document.getElementById('fLat').value = lat.toFixed(6);
+    document.getElementById('fLon').value = lon.toFixed(6);
+    if (marker) marker.setLatLng([lat, lon]); else marker = L.marker([lat, lon]).addTo(map);
+    map.setView([lat, lon], 15);
+}
+map.on('click', e => setPunto(e.latlng.lat, e.latlng.lng));
+function usarMiUbicacion() {
+    if (!navigator.geolocation) return alert('Sin geolocalización');
+    navigator.geolocation.getCurrentPosition(p => setPunto(p.coords.latitude, p.coords.longitude), () => alert('No se pudo obtener tu ubicación'));
+}
+function badge(e) { return `<span class="badge b-${e}">${e}</span>`; }
+function itemHTML(d) {
+    return `<div class="den-item"><b>${d.ticket}</b> ${badge(d.estado)}<br>
+    <span>📍 ${d.barrio || ''} · ${d.categoria || ''}</span><br>
+    <span>${(d.descripcion || '').slice(0, 140)}</span><br>
+    ${d.ruta_token ? `<span>🚚 En ruta ${d.ruta_token}</span><br>` : ''}
+    ${d.observacion_cierre ? `<span>📝 ${d.observacion_cierre}</span><br>` : ''}
+    <span class="flow">${d.fecha_creacion || ''}${d.fecha_cierre ? ' → cerrada ' + d.fecha_cierre : ''}</span></div>`;
+}
+async function crearDenuncia() {
+    const body = {
+        nombre_ciudadano: document.getElementById('fNombre').value.trim(),
+        telefono: document.getElementById('fTelefono').value.trim(),
+        categoria: document.getElementById('fCategoria').value,
+        barrio: document.getElementById('fBarrio').value.trim(),
+        direccion_referencia: document.getElementById('fDireccion').value.trim(),
+        descripcion: document.getElementById('fDescripcion').value.trim(),
+        latitud: parseFloat(document.getElementById('fLat').value),
+        longitud: parseFloat(document.getElementById('fLon').value),
+        foto_url: document.getElementById('fFoto').value.trim()
+    };
+    if (!body.barrio || !body.descripcion || isNaN(body.latitud) || isNaN(body.longitud)) {
+        alert('Completa barrio, descripción y marca el punto en el mapa.'); return;
+    }
+    const btn = document.getElementById('btnCrear'); btn.disabled = true;
+    try {
+        const r = await fetchAuth('/api/denuncias', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.message || r.statusText);
+        const box = document.getElementById('ticketBox');
+        box.style.display = 'block';
+        box.innerHTML = `✅ Denuncia registrada. Tu ticket: <b>${data.ticket}</b> (estado: pendiente)`;
+        document.getElementById('fDescripcion').value = '';
+        cargarMias();
+    } catch (e) { alert('No se pudo crear: ' + e.message); }
+    finally { btn.disabled = false; }
+}
+async function cargarMias() {
+    const el = document.getElementById('listaMias');
+    try {
+        const r = await fetchAuth('/api/denuncias?estado=todos');
+        const data = await r.json();
+        el.innerHTML = data.length ? data.map(itemHTML).join('') : '<p class="flow">Aún no tienes denuncias.</p>';
+    } catch (e) { el.innerHTML = '<p class="flow">Error cargando.</p>'; }
+}
+async function buscarTicket() {
+    const t = document.getElementById('qTicket').value.trim().toUpperCase();
+    const el = document.getElementById('ticketResult');
+    if (!t) return;
+    try {
+        const r = await fetch('/api/denuncias?ticket=' + encodeURIComponent(t));
+        if (!r.ok) { el.innerHTML = '<p class="flow">Ticket no encontrado.</p>'; return; }
+        el.innerHTML = itemHTML(await r.json());
+    } catch (e) { el.innerHTML = '<p class="flow">Error en la búsqueda.</p>'; }
+}
+cargarMias();
+</script>
+</body>
+</html>

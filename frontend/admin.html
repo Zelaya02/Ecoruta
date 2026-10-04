@@ -450,6 +450,18 @@
             border: 1px solid rgba(59, 130, 246, 0.2);
         }
 
+        .badge-gestor {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        .badge-ciudadano {
+            background: rgba(139, 92, 246, 0.12);
+            color: #a78bfa;
+            border: 1px solid rgba(139, 92, 246, 0.25);
+        }
+
         .badge-status {
             padding: 6px 12px;
             border-radius: 20px;
@@ -739,6 +751,8 @@
                     <option value="todos">Todos los roles</option>
                     <option value="superadmin">Super Admin</option>
                     <option value="admin">Administrador</option>
+                    <option value="gestor">Gestor rutas+denuncias</option>
+                    <option value="ciudadano">Ciudadano</option>
                 </select>
 
                 <select id="filtroEstado" class="select-filter" onchange="filtrarUsuarios()">
@@ -798,6 +812,8 @@
                 <div style="margin-bottom:16px;">
                     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px; color:var(--text-muted); text-transform:uppercase;">Rol del Sistema</label>
                     <select id="nuevoRol" class="control-input" style="width:100%; box-sizing:border-box;">
+                        <option value="ciudadano">Ciudadano (denuncias)</option>
+                        <option value="gestor">Gestor rutas + denuncias</option>
                         <option value="admin">Administrador Standard</option>
                         <option value="superadmin">Super Admin</option>
                     </select>
@@ -834,6 +850,8 @@
                 <div style="margin-bottom:16px;">
                     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px; color:var(--text-muted); text-transform:uppercase;">Rol del Sistema</label>
                     <select id="editRol" class="control-input" style="width:100%; box-sizing:border-box;">
+                        <option value="ciudadano">Ciudadano (denuncias)</option>
+                        <option value="gestor">Gestor rutas + denuncias</option>
                         <option value="admin">Administrador Standard</option>
                         <option value="superadmin">Super Admin</option>
                     </select>
@@ -956,11 +974,14 @@
                 return;
             }
 
+            const badgeFor = (rol) => {
+                if (rol === 'superadmin') return `<span class="badge-role badge-superadmin"><i class="fas fa-crown"></i> Super Admin</span>`;
+                if (rol === 'gestor') return `<span class="badge-role badge-gestor"><i class="fas fa-route"></i> Gestor</span>`;
+                if (rol === 'ciudadano') return `<span class="badge-role badge-ciudadano"><i class="fas fa-user"></i> Ciudadano</span>`;
+                return `<span class="badge-role badge-admin"><i class="fas fa-user-shield"></i> Admin</span>`;
+            };
             tbody.innerHTML = lista.map(u => {
-                const isSuper = u.rol === 'superadmin';
-                const roleBadge = isSuper 
-                    ? `<span class="badge-role badge-superadmin"><i class="fas fa-crown"></i> Super Admin</span>`
-                    : `<span class="badge-role badge-admin"><i class="fas fa-user-shield"></i> Admin</span>`;
+                const roleBadge = badgeFor(u.rol);
 
                 const statusBadge = u.activo
                     ? `<span class="badge-status badge-active"><i class="fas fa-circle" style="font-size:8px;"></i> Activo</span>`
