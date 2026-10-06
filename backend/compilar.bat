@@ -49,15 +49,12 @@ if defined JAVA_HOME (
 )
 echo.
 
-REM Configurar variables de entorno (cambiar segun sea necesario)
-if "%DB_PASSWORD%"=="" (
-    echo ⚠️  Variable DB_PASSWORD no definida. Configure sus credenciales:
-    echo    set DB_PASSWORD=su_contraseña
-    echo    set DB_USER=postgres
-    echo    set ORS_API_KEY=su_api_key_opencage
-    echo.
-)
+REM Configurar variables de entorno por defecto
+if "%DB_PASSWORD%"=="" set "DB_PASSWORD=Zelaya11"
+if "%DB_USER%"=="" set "DB_USER=postgres"
+echo ✅ Credenciales DB: Usuario=%DB_USER% | Password configurada
 echo.
+
 
 REM Crear carpetas necesarias
 echo Creando carpetas...

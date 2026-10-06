@@ -1,0 +1,7 @@
+{
+  "permission": {
+    "*": "ask",
+    "bash": "ask",
+    "external_directory": "deny"
+  }
+}

@@ -310,13 +310,29 @@ public class Main {
         return val != null && !val.isEmpty() ? val : def;
     }
 
-    /** Detecta el puerto PostgreSQL disponible (prueba 5000 primero, luego 5432). */
+    /** Detecta el puerto PostgreSQL disponible y asegura que ruteo_db exista. */
     private static String detectDbUrl() {
-        String[] candidatos = {
-            "jdbc:postgresql://localhost:5000/ruteo_db",
-            "jdbc:postgresql://localhost:5432/ruteo_db"
-        };
-        for (String url : candidatos) {
+        int[] puertos = {5432, 5000};
+        
+        // 1. Intentar asegurar que ruteo_db exista conectando a la BD sistema postgres
+        for (int p : puertos) {
+            String sysUrl = "jdbc:postgresql://localhost:" + p + "/postgres";
+            try (Connection c = DriverManager.getConnection(sysUrl, DB_USER, DB_PASSWORD);
+                 Statement stmt = c.createStatement()) {
+                ResultSet rs = stmt.executeQuery("SELECT 1 FROM pg_database WHERE datname = 'ruteo_db'");
+                if (!rs.next()) {
+                    stmt.executeUpdate("CREATE DATABASE ruteo_db");
+                    System.out.println("✅ Base de datos 'ruteo_db' creada automáticamente en puerto " + p);
+                }
+                String dbUrl = "jdbc:postgresql://localhost:" + p + "/ruteo_db";
+                System.out.println("✅ Conectado a PostgreSQL en: " + dbUrl);
+                return dbUrl;
+            } catch (SQLException ignored) {}
+        }
+        
+        // 2. Probador directo si la BD ya existia
+        for (int p : puertos) {
+            String url = "jdbc:postgresql://localhost:" + p + "/ruteo_db";
             try (Connection c = DriverManager.getConnection(url, DB_USER, DB_PASSWORD)) {
                 System.out.println("✅ Conectado a PostgreSQL en: " + url);
                 return url;
@@ -325,7 +341,7 @@ public class Main {
             }
         }
         System.err.println("❌ No se pudo conectar a PostgreSQL en ningún puerto conocido.");
-        return candidatos[candidatos.length - 1]; // fallback
+        return "jdbc:postgresql://localhost:5432/ruteo_db"; // fallback
     }
 
     public static void main(String[] args) throws IOException {
