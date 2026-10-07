@@ -26,14 +26,12 @@ if defined JAVA_HOME (
 )
 echo.
 
-REM Configurar variables de entorno (cambiar segun sea necesario)
-if "%DB_PASSWORD%"=="" (
-    echo ⚠️  Variable DB_PASSWORD no definida.
-    echo    Configure antes de ejecutar:
-    echo    set DB_PASSWORD=su_contraseña
-    echo    set DB_USER=postgres
-    echo.
-)
+REM Configurar variables de entorno por defecto (igual que compilar.bat)
+if "%DB_PASSWORD%"=="" set "DB_PASSWORD=Zelaya11"
+if "%DB_USER%"=="" set "DB_USER=postgres"
+if "%DB_NAME%"=="" set "DB_NAME=ruteo_db"
+echo ✅ DB destino: %DB_USER%@localhost / %DB_NAME%
+echo.
 
 REM Verificar driver
 if not exist "lib\postgresql-42.6.0.jar" (

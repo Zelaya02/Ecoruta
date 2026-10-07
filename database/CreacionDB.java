@@ -5,12 +5,12 @@ import java.util.ArrayList;
 
 public class CreacionDB {
     public static void main(String[] args) {
-        int port = 5432; 
-        String dbName = "ruteo_db";
+        int port = 5432;
+        String dbName = System.getenv().getOrDefault("DB_NAME", "ruteo_db");
         String user = System.getenv().getOrDefault("DB_USER", "postgres");
-        String pass = System.getenv().getOrDefault("DB_PASSWORD", "");
-        
-        System.out.println("Iniciando creacion de Base de Datos...");
+        String pass = System.getenv().getOrDefault("DB_PASSWORD", "Zelaya11");
+
+        System.out.println("Iniciando creacion de Base de Datos '" + dbName + "'...");
 
         for (int p : new int[]{5000, 5432}) {
             try (Connection test = DriverManager.getConnection("jdbc:postgresql://localhost:" + p + "/postgres", user, pass)) {
@@ -24,10 +24,15 @@ public class CreacionDB {
             String rootUrl = "jdbc:postgresql://localhost:" + port + "/postgres";
             try (Connection rootConn = DriverManager.getConnection(rootUrl, user, pass);
                  Statement stmt = rootConn.createStatement()) {
-                
-                stmt.executeUpdate("DROP DATABASE IF EXISTS " + dbName + " WITH (FORCE)");
-                stmt.executeUpdate("CREATE DATABASE " + dbName);
-                System.out.println("✅ Base de datos '" + dbName + "' creada.");
+
+                // Sin DROP: solo crea si no existe, nunca borra datos existentes.
+                ResultSet existe = stmt.executeQuery("SELECT 1 FROM pg_database WHERE datname = '" + dbName + "'");
+                if (existe.next()) {
+                    System.out.println("ℹ️  La base de datos '" + dbName + "' ya existe. Se conserva su contenido.");
+                } else {
+                    stmt.executeUpdate("CREATE DATABASE " + dbName);
+                    System.out.println("✅ Base de datos '" + dbName + "' creada.");
+                }
             }
 
             String dbUrl = "jdbc:postgresql://localhost:" + port + "/" + dbName;
@@ -45,9 +50,15 @@ public class CreacionDB {
                     System.out.println("⚠️  No se encontro schema.sql. Se omite la creacion de tablas.");
                 }
 
-                // --- Clientes por defecto ---
+                // --- Clientes por defecto (solo si la tabla esta vacia: no duplicar) ---
+                int clientesActuales = 0;
+                try (ResultSet rc = dbStmt.executeQuery("SELECT COUNT(*) FROM clientes")) {
+                    if (rc.next()) clientesActuales = rc.getInt(1);
+                }
                 Path sqlPath = Paths.get("import.sql");
-                if (Files.exists(sqlPath)) {
+                if (clientesActuales > 0) {
+                    System.out.println("ℹ️  Ya hay " + clientesActuales + " clientes. Se omite la carga inicial (sin duplicar).");
+                } else if (Files.exists(sqlPath)) {
                     System.out.println("Cargando clientes...");
                     List<String> lines = Files.readAllLines(sqlPath);
                     int count = 0;

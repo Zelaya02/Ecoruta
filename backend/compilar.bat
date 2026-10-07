@@ -52,8 +52,38 @@ echo.
 REM Configurar variables de entorno por defecto
 if "%DB_PASSWORD%"=="" set "DB_PASSWORD=Zelaya11"
 if "%DB_USER%"=="" set "DB_USER=postgres"
+if "%DB_NAME%"=="" set "DB_NAME=ruteo_db"
 echo ✅ Credenciales DB: Usuario=%DB_USER% | Password configurada
 echo.
+
+REM Verificar que la base de datos exista (solo avisa, no la crea ni la borra)
+echo Verificando base de datos "%DB_NAME%"...
+where jshell >nul 2>nul
+if errorlevel 1 goto :sin_jshell
+echo import java.sql.*; > "%TEMP%\ecoruta_checkdb.jsh"
+echo String dbName = System.getenv().getOrDefault("DB_NAME", "ruteo_db"); >> "%TEMP%\ecoruta_checkdb.jsh"
+echo String dbUser = System.getenv().getOrDefault("DB_USER", "postgres"); >> "%TEMP%\ecoruta_checkdb.jsh"
+echo String dbPass = System.getenv().getOrDefault("DB_PASSWORD", "Zelaya11"); >> "%TEMP%\ecoruta_checkdb.jsh"
+echo boolean encontrada = false; >> "%TEMP%\ecoruta_checkdb.jsh"
+echo for (int puerto : new int[]{5432, 5000}) { try (Connection c = DriverManager.getConnection("jdbc:postgresql://localhost:" + puerto + "/" + dbName, dbUser, dbPass)) { encontrada = true; break; } catch (Exception e) {} } >> "%TEMP%\ecoruta_checkdb.jsh"
+echo System.out.println(encontrada ? "DB_OK" : "DB_FALTA:" + dbName); >> "%TEMP%\ecoruta_checkdb.jsh"
+echo /exit >> "%TEMP%\ecoruta_checkdb.jsh"
+jshell --class-path "lib\postgresql-42.6.0.jar" "%TEMP%\ecoruta_checkdb.jsh" 2>nul | findstr /C:"DB_OK" >nul
+if errorlevel 1 goto :db_faltante
+echo ✅ Base de datos "%DB_NAME%" disponible.
+echo.
+goto :db_ok
+:db_faltante
+echo.
+echo ⚠️  AVISO: no se encontro la base de datos "%DB_NAME%" o no hay conexion a PostgreSQL.
+echo    Ejecuta database\inicializar_db.bat para crearla antes de continuar.
+echo.
+pause
+goto :db_ok
+:sin_jshell
+echo ⚠️  No se pudo verificar la BD (jshell no disponible). Se continua igual.
+echo.
+:db_ok
 
 
 REM Crear carpetas necesarias
