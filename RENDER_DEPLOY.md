@@ -30,6 +30,12 @@ git push origin <tu-rama>
 
 ⚠️ Cambia estas claves en producción desde `admin.html` (reset de contraseña).
 
+> **Nota de roles**: `admin` y `gestor` son equivalentes (alias). Ambos entran a
+> `index.html` con los mismos permisos: rutas, denuncias, choferes, vehículos,
+> reglas y estadísticas. `admin` se conserva por compatibilidad con NEXO;
+> para operar el día a día usa `gestor`. El `chofer` no tiene login: trabaja
+> con el link `ruta.html?token=...` que le comparte el gestor.
+
 ## 4. Probar el ciclo denuncia → ruta → cierre
 
 1. Entra como `ciudadano` → crea denuncia con punto en mapa → anota el ticket `ECO-...`.

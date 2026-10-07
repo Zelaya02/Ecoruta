@@ -2043,7 +2043,8 @@ String dateFilter = switch (periodo) {
         return null;
     }
 
-    /** Gestor, admin y superadmin pueden administrar denuncias y rutas. */
+    /** Gestor, admin y superadmin pueden administrar denuncias y rutas.
+     *  NOTA: admin y gestor son equivalentes (alias por compatibilidad NEXO). */
     private static boolean canManageRutas(HttpExchange exchange) {
         String rol = getRolFromSession(exchange);
         return rol != null && ("gestor".equals(rol) || "admin".equals(rol) || "superadmin".equals(rol));
