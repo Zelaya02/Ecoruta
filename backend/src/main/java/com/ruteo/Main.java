@@ -120,12 +120,14 @@ public class Main {
             try { stmt.executeUpdate("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT true"); } catch (SQLException ignored) {}
             try { stmt.executeUpdate("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS rol TEXT DEFAULT 'admin'"); } catch (SQLException ignored) {}
             
+            // Rol unificado: admin -> gestor (misma cuenta admin/nexo2025, rol gestor).
+            stmt.executeUpdate("UPDATE usuarios SET rol = 'gestor' WHERE rol = 'admin'");
             ResultSet rsAdmin = stmt.executeQuery("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'");
             if (rsAdmin.next() && rsAdmin.getInt(1) == 0) {
-                stmt.executeUpdate("INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('admin', 'nexo2025', 'Administrador', 'admin', true)");
-                System.out.println("✅ Usuario administrador por defecto creado (admin/nexo2025).");
+                stmt.executeUpdate("INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('admin', 'nexo2025', 'Gestor de Rutas y Denuncias', 'gestor', true)");
+                System.out.println("✅ Usuario gestor por defecto creado (admin/nexo2025, rol gestor).");
             } else {
-                stmt.executeUpdate("UPDATE usuarios SET rol = 'admin', activo = true WHERE username = 'admin'");
+                stmt.executeUpdate("UPDATE usuarios SET rol = 'gestor', activo = true WHERE username = 'admin'");
             }
 
             ResultSet rsSuper = stmt.executeQuery("SELECT COUNT(*) FROM usuarios WHERE username = 'superadmin'");
@@ -1880,11 +1882,12 @@ String dateFilter = switch (periodo) {
                             return;
                         }
                         String sessionToken = java.util.UUID.randomUUID().toString();
-                        activeTokens.put(sessionToken, new UserSession(System.currentTimeMillis(), usuario.getUsername(), usuario.getRol(), usuario.getId()));
+                        String rolSesion = normalizarRol(usuario.getRol());
+                        activeTokens.put(sessionToken, new UserSession(System.currentTimeMillis(), usuario.getUsername(), rolSesion, usuario.getId()));
                         response.put("success", true);
                         response.put("message", "Login exitoso");
                         response.put("usuario", usuario.getNombre());
-                        response.put("rol", usuario.getRol() != null ? usuario.getRol() : "admin");
+                        response.put("rol", rolSesion);
                         response.put("token", sessionToken);
                         response.put("redirect", "index.html");
                         sendResponse(exchange, 200, gson.toJson(response));
@@ -1939,7 +1942,7 @@ String dateFilter = switch (periodo) {
 
                     String username = json.get("username").getAsString().trim();
                     String nombre = json.get("nombre").getAsString().trim();
-                    String rol = json.has("rol") ? json.get("rol").getAsString() : "admin";
+                    String rol = normalizarRol(json.has("rol") ? json.get("rol").getAsString() : "gestor");
                     String password = json.get("password").getAsString().trim();
 
                     if (username.isEmpty() || password.isEmpty() || nombre.isEmpty()) {
@@ -1965,7 +1968,7 @@ String dateFilter = switch (periodo) {
 
                     int id = json.get("id").getAsInt();
                     String nombre = json.get("nombre").getAsString().trim();
-                    String rol = json.has("rol") ? json.get("rol").getAsString() : "admin";
+                    String rol = normalizarRol(json.has("rol") ? json.get("rol").getAsString() : "gestor");
                     boolean activo = json.has("activo") ? json.get("activo").getAsBoolean() : true;
 
                     boolean ok = usuarioRepo.actualizarUsuario(id, nombre, rol, activo);
@@ -2038,13 +2041,20 @@ String dateFilter = switch (periodo) {
         if (authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7).trim();
             UserSession session = activeTokens.get(token);
-            if (session != null) return session.rol != null ? session.rol.toLowerCase() : "admin";
+            if (session != null) return normalizarRol(session.rol);
         }
         return null;
     }
 
-    /** Gestor, admin y superadmin pueden administrar denuncias y rutas.
-     *  NOTA: admin y gestor son equivalentes (alias por compatibilidad NEXO). */
+    /** Rol unificado: el antiguo 'admin' se trata como 'gestor'. */
+    private static String normalizarRol(String rol) {
+        if (rol == null) return "gestor";
+        String r = rol.toLowerCase();
+        if ("admin".equals(r)) return "gestor";
+        return r;
+    }
+
+    /** Gestor y superadmin pueden administrar denuncias y rutas. */
     private static boolean canManageRutas(HttpExchange exchange) {
         String rol = getRolFromSession(exchange);
         return rol != null && ("gestor".equals(rol) || "admin".equals(rol) || "superadmin".equals(rol));

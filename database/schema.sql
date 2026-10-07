@@ -17,8 +17,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
 -- Usuarios por defecto (idempotente)
 -- Roles unificados: superadmin (gestiona perfiles), gestor (rutas + denuncias, alias admin),
 -- ciudadano (crea/consulta denuncias), chofer (acceso por token de ruta)
-INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('admin', 'nexo2025', 'Administrador', 'admin', true)
+INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('admin', 'nexo2025', 'Gestor de Rutas y Denuncias', 'gestor', true)
     ON CONFLICT (username) DO NOTHING;
+-- Migración rol unificado: el antiguo 'admin' pasa a 'gestor'
+UPDATE usuarios SET rol = 'gestor' WHERE rol = 'admin';
 INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('superadmin', 'supernexo2025', 'Super Administrador', 'superadmin', true)
     ON CONFLICT (username) DO NOTHING;
 INSERT INTO usuarios (username, password, nombre, rol, activo) VALUES ('gestor', 'gestor2026', 'Gestor de Rutas y Denuncias', 'gestor', true)

@@ -750,7 +750,6 @@
                 <select id="filtroRol" class="select-filter" onchange="filtrarUsuarios()">
                     <option value="todos">Todos los roles</option>
                     <option value="superadmin">Super Admin</option>
-                    <option value="admin">Administrador</option>
                     <option value="gestor">Gestor rutas+denuncias</option>
                     <option value="ciudadano">Ciudadano</option>
                 </select>
@@ -814,7 +813,6 @@
                     <select id="nuevoRol" class="control-input" style="width:100%; box-sizing:border-box;">
                         <option value="ciudadano">Ciudadano (denuncias)</option>
                         <option value="gestor">Gestor rutas + denuncias</option>
-                        <option value="admin">Administrador Standard</option>
                         <option value="superadmin">Super Admin</option>
                     </select>
                 </div>
@@ -852,7 +850,6 @@
                     <select id="editRol" class="control-input" style="width:100%; box-sizing:border-box;">
                         <option value="ciudadano">Ciudadano (denuncias)</option>
                         <option value="gestor">Gestor rutas + denuncias</option>
-                        <option value="admin">Administrador Standard</option>
                         <option value="superadmin">Super Admin</option>
                     </select>
                 </div>
@@ -976,9 +973,8 @@
 
             const badgeFor = (rol) => {
                 if (rol === 'superadmin') return `<span class="badge-role badge-superadmin"><i class="fas fa-crown"></i> Super Admin</span>`;
-                if (rol === 'gestor') return `<span class="badge-role badge-gestor"><i class="fas fa-route"></i> Gestor</span>`;
                 if (rol === 'ciudadano') return `<span class="badge-role badge-ciudadano"><i class="fas fa-user"></i> Ciudadano</span>`;
-                return `<span class="badge-role badge-admin"><i class="fas fa-user-shield"></i> Admin</span>`;
+                return `<span class="badge-role badge-gestor"><i class="fas fa-route"></i> Gestor</span>`;
             };
             tbody.innerHTML = lista.map(u => {
                 const roleBadge = badgeFor(u.rol);
@@ -1068,7 +1064,7 @@
             document.getElementById('editUserId').value = user.id;
             document.getElementById('editUsername').value = user.username;
             document.getElementById('editNombre').value = user.nombre || '';
-            document.getElementById('editRol').value = user.rol || 'admin';
+                document.getElementById('editRol').value = (user.rol === 'admin' ? 'gestor' : (user.rol || 'gestor'));
             document.getElementById('editActivo').value = user.activo ? 'true' : 'false';
             document.getElementById('modalEditarUsuario').style.display = 'flex';
         }

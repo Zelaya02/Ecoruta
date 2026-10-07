@@ -44,7 +44,7 @@ public class UsuarioRepository {
                         user.setId(rs.getInt("id"));
                         user.setUsername(rs.getString("username"));
                         user.setNombre(rs.getString("nombre"));
-                        user.setRol(rs.getString("rol") != null ? rs.getString("rol") : "admin");
+                        user.setRol(rs.getString("rol") != null ? rs.getString("rol") : "gestor");
                         try {
                             user.setActivo(rs.getBoolean("activo"));
                         } catch (SQLException ignored) {
@@ -71,7 +71,7 @@ public class UsuarioRepository {
                 u.setId(rs.getInt("id"));
                 u.setUsername(rs.getString("username"));
                 u.setNombre(rs.getString("nombre"));
-                u.setRol(rs.getString("rol") != null ? rs.getString("rol") : "admin");
+                u.setRol(rs.getString("rol") != null ? rs.getString("rol") : "gestor");
                 u.setActivo(rs.getBoolean("activo"));
                 lista.add(u);
             }

@@ -24,17 +24,16 @@ git push origin <tu-rama>
 | Usuario | Clave | Rol | Entra a |
 |---|---|---|---|
 | `superadmin` | `supernexo2025` | superadmin | `admin.html` — gestiona perfiles |
-| `admin` | `nexo2025` | admin | `index.html` — rutas + denuncias |
+| `admin` | `nexo2025` | gestor | `index.html` — rutas + denuncias |
 | `gestor` | `gestor2026` | gestor | `index.html` — rutas + denuncias |
 | `ciudadano` | `ciudadano2026` | ciudadano | `ciudadano.html` — crea/consulta denuncias |
 
 ⚠️ Cambia estas claves en producción desde `admin.html` (reset de contraseña).
 
-> **Nota de roles**: `admin` y `gestor` son equivalentes (alias). Ambos entran a
-> `index.html` con los mismos permisos: rutas, denuncias, choferes, vehículos,
-> reglas y estadísticas. `admin` se conserva por compatibilidad con NEXO;
-> para operar el día a día usa `gestor`. El `chofer` no tiene login: trabaja
-> con el link `ruta.html?token=...` que le comparte el gestor.
+> **Roles unificados**: solo hay 3 roles — `superadmin`, `gestor` y `ciudadano`.
+> El antiguo `admin` se migró a `gestor` (misma cuenta `admin/nexo2025`). El
+> `chofer` no tiene login: trabaja con el link `ruta.html?token=...` que le
+> comparte el gestor.
 
 ## 4. Probar el ciclo denuncia → ruta → cierre
 

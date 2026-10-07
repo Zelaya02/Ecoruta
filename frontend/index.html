@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>
         const token = localStorage.getItem('nexo_token');
-        const rol = (localStorage.getItem('nexo_rol') || 'admin').toLowerCase();
+        const rol = (localStorage.getItem('nexo_rol') || 'gestor').toLowerCase();
         if (!token) {
             window.location.href = 'login.html';
         } else if (rol === 'superadmin') {
@@ -14,7 +14,7 @@
         } else if (rol === 'ciudadano') {
             window.location.href = 'ciudadano.html';
         }
-        // gestor y admin comparten este panel: rutas + denuncias
+        // panel del gestor (rol operativo unificado): rutas + denuncias
 
         if (localStorage.getItem('darkMode') === 'enabled') {
             document.documentElement.classList.add('dark-mode');

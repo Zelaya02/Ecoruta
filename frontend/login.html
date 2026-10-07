@@ -396,7 +396,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    const userRol = data.rol || 'admin';
+                    const userRol = data.rol || 'gestor';
                     localStorage.setItem('nexo_user', data.usuario);
                     localStorage.setItem('nexo_token', data.token);
                     localStorage.setItem('nexo_rol', userRol);
@@ -408,7 +408,7 @@
                         } else if (r === 'ciudadano') {
                             window.location.href = 'ciudadano.html';
                         } else {
-                            // admin y gestor comparten el panel de rutas + denuncias
+                            // gestor (rol operativo unificado) -> panel de rutas + denuncias
                             window.location.href = 'index.html';
                         }
                     }, 600);
