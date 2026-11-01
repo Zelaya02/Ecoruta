@@ -50,6 +50,10 @@ public class UsuarioRepository {
                         } catch (SQLException ignored) {
                             user.setActivo(true);
                         }
+                        try {
+                            Object cid = rs.getObject("chofer_id");
+                            if (cid != null) user.setChoferId(((Number) cid).intValue());
+                        } catch (SQLException ignored) {}
                         return user;
                     }
                 }
@@ -62,7 +66,7 @@ public class UsuarioRepository {
 
     public List<Usuario> listarUsuarios() {
         List<Usuario> lista = new ArrayList<>();
-        String sql = "SELECT id, username, nombre, rol, COALESCE(activo, true) as activo FROM usuarios ORDER BY id ASC";
+        String sql = "SELECT id, username, nombre, rol, COALESCE(activo, true) as activo, chofer_id FROM usuarios ORDER BY id ASC";
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass);
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
@@ -73,6 +77,10 @@ public class UsuarioRepository {
                 u.setNombre(rs.getString("nombre"));
                 u.setRol(rs.getString("rol") != null ? rs.getString("rol") : "gestor");
                 u.setActivo(rs.getBoolean("activo"));
+                try {
+                    Object cid = rs.getObject("chofer_id");
+                    if (cid != null) u.setChoferId(((Number) cid).intValue());
+                } catch (SQLException ignored) {}
                 lista.add(u);
             }
         } catch (SQLException e) {

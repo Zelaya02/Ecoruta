@@ -9,6 +9,8 @@ public class Usuario {
 
     private boolean activo = true;
 
+    private Integer choferId;
+
     public Usuario() {}
 
     public Usuario(int id, String username, String password, String nombre, String rol, boolean activo) {
@@ -18,6 +20,16 @@ public class Usuario {
         this.nombre = nombre;
         this.rol = rol;
         this.activo = activo;
+    }
+
+    public Usuario(int id, String username, String password, String nombre, String rol, boolean activo, Integer choferId) {
+        this.id = id;
+        this.username = username;
+        this.password = password;
+        this.nombre = nombre;
+        this.rol = rol;
+        this.activo = activo;
+        this.choferId = choferId;
     }
 
     // Getters and Setters
@@ -33,4 +45,6 @@ public class Usuario {
     public void setRol(String rol) { this.rol = rol; }
     public boolean isActivo() { return activo; }
     public void setActivo(boolean activo) { this.activo = activo; }
+    public Integer getChoferId() { return choferId; }
+    public void setChoferId(Integer choferId) { this.choferId = choferId; }
 }

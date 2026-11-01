@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    <script src="js/glass-dialogs.js"></script>
     <style>
         :root {
             --primary: linear-gradient(135deg, #0f3d2e 0%, #2e9e5b 100%);
@@ -231,8 +232,8 @@
             }
         }
 
-        function addCategoria() {
-            const nueva = prompt("Ingrese el nombre de la nueva categoría:");
+        async function addCategoria() {
+            const nueva = await ecoPrompt("Ingrese el nombre de la nueva categoría:", "", "Nueva Categoría", { placeholder: "Ej: reciclables, peligrosos..." });
             if (nueva) {
                 const cat = nueva.toLowerCase().trim();
                 if (!reglasCargadas.find(r => r.categoria === cat)) {
@@ -285,7 +286,7 @@
         }
 
         async function eliminarReglaLocal(cat) {
-            if (confirm(`¿Eliminar la regla para la categoría "${cat}"?`)) {
+            if (await ecoConfirm(`¿Eliminar la regla para la categoría "${cat}"?`, 'Eliminar Regla', { danger: true })) {
                 try {
                     const res = await fetchWithAuth(`/api/reglas?categoria=${encodeURIComponent(cat)}`, {
                         method: 'DELETE'

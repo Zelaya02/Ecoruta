@@ -22,23 +22,29 @@ Antes de comenzar, asegúrate de tener instalado:
 
 ---
 
-## 🚀 Guía de Instalación y Ejecución
+## ⚡ Inicio Rápido (Recomendado)
 
-Los tres servicios deben ejecutarse en **terminales separadas y simultáneas**.
+Los tres servicios (Backend, Agente IA, Bot de Telegram) deben ejecutarse en **terminales separadas y simultáneas**.
 
-### 1. Base de Datos (PostgreSQL)
+### Opción A: Script automático
+Haz doble clic en el archivo **`iniciar_proyecto.bat`** (ubicado en la raíz del proyecto). El script:
+- Verifica e inicia PostgreSQL en el puerto `5432` si no está corriendo.
+- Compila el código Java del backend si hubo cambios.
+- Inicia el servidor HTTP en el puerto `8080`.
+- Abre automáticamente la pantalla de login en tu navegador predeterminado.
 
+### Opción B: Ejecución manual paso a paso
+
+#### 1. Base de Datos (PostgreSQL)
 Crea la base de datos:
-
 ```sql
 CREATE DATABASE ruteo_db;
 ```
-
 Usuario por defecto: `postgres` / Contraseña: `Zelaya11`  
 (modificable en los archivos `.env`)
+Para inicializar tablas: ejecuta `database/inicializar_db.bat`.
 
-### 2. Backend Java (Puerto 8080)
-
+#### 2. Backend Java (Puerto 8080)
 ```bash
 cd backend
 .\inicializar_db.bat    # Crea tablas y usuarios por defecto

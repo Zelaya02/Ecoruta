@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap"
         rel="stylesheet">
+    <script src="js/glass-dialogs.js"></script>
     <style>
         * {
             margin: 0;
@@ -588,10 +589,14 @@
                     const est = (c.estado || 'pendiente').toLowerCase();
                     const estadoIcon = est === 'entregado' ? '✅' : (est === 'rechazado' ? '❌' : '🕒');
 
-                    const pinBg = est === 'entregado' ? '#10B981' : (est === 'rechazado' ? '#EF4444' : '#5B6BFF');
+                    const isDenuncia = c.es_denuncia || c.tipo === 'denuncia' || (c.nombre && c.nombre.toLowerCase().startsWith('denuncia'));
+                    const pinBg = est === 'entregado' ? '#10B981' : (est === 'rechazado' ? '#EF4444' : (isDenuncia ? '#F59E0B' : '#5B6BFF'));
+                    const borderRing = isDenuncia && est === 'pendiente' ? 'border:3px solid #FEF08A; box-shadow:0 0 12px rgba(245,158,11,0.85);' : 'border:2px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3);';
+                    const iconText = isDenuncia ? `<i class="fas fa-exclamation" style="font-size:9px; margin-right:1px;"></i>${i + 1}` : `${i + 1}`;
+
                     const customIcon = L.divIcon({
                         className: 'custom-map-pin',
-                        html: `<div style="background:${pinBg}; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; border:2px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3);">${i + 1}</div>`,
+                        html: `<div style="background:${pinBg}; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; ${borderRing}">${iconText}</div>`,
                         iconSize: [28, 28],
                         iconAnchor: [14, 14]
                     });
@@ -599,7 +604,9 @@
                     const marker = L.marker(latlng, { icon: customIcon }).addTo(mapInstance);
                     marker.bindPopup(`
                         <div style="font-family:'Inter',sans-serif; padding:4px;">
+                            ${isDenuncia ? `<div style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:800; margin-bottom:4px; display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-exclamation-triangle"></i> DENUNCIA ASIGNADA ${c.ticket ? `· ${escapeHtml(c.ticket)}` : ''}</div><br>` : ''}
                             <b style="font-size:14px; color:#111827;">${i + 1}. ${escapeHtml(c.nombre)}</b><br>
+                            ${c.descripcion ? `<p style="font-size:12px; color:#4B5563; margin:4px 0;">"${escapeHtml(c.descripcion)}"</p>` : ''}
                             <span style="font-size:12px; color:#4B5563;">Estado: ${estadoIcon} ${est.toUpperCase()}</span>
                         </div>
                     `);
@@ -627,14 +634,22 @@
             clientes.forEach((c, idx) => {
                 const estadoActivo = c.estado || 'pendiente';
                 const observacion = c.observacion || '';
+                const isDenuncia = c.es_denuncia || c.tipo === 'denuncia' || (c.nombre && c.nombre.toLowerCase().startsWith('denuncia'));
                 const card = document.createElement('div');
                 card.className = 'cliente-card';
                 card.id = `card-${c.id}`;
+                if (isDenuncia) card.style.borderLeft = '4px solid #f59e0b';
                 card.innerHTML = `
                     <div class="cliente-header">
-                        <div class="cliente-numero">${idx + 1}</div>
+                        <div class="cliente-numero" style="${isDenuncia && estadoActivo === 'pendiente' ? 'background:linear-gradient(135deg, #f59e0b, #d97706); box-shadow:0 0 10px rgba(245,158,11,0.5);' : ''}">${idx + 1}</div>
                         <div class="cliente-info">
+                            ${isDenuncia ? `
+                                <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.35); color:#d97706; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:6px; margin-bottom:6px;">
+                                    <i class="fas fa-exclamation-triangle"></i> DENUNCIA ASIGNADA ${c.ticket ? `· Ticket: ${escapeHtml(c.ticket)}` : ''}
+                                </div>
+                            ` : ''}
                             <h3>${escapeHtml(c.nombre)}</h3>
+                            ${isDenuncia && c.descripcion ? `<div style="font-size:12px; color:var(--text-muted); background:rgba(0,0,0,0.04); padding:6px 10px; border-radius:6px; margin:6px 0 8px; border-left:3px solid #f59e0b;">"${escapeHtml(c.descripcion)}"</div>` : ''}
                             <div class="distancia"><i class="fas fa-location-arrow"></i> ${c.distancia_siguiente || 0} km al siguiente cliente</div>
                         </div>
                     </div>
@@ -701,7 +716,7 @@
         }
 
         async function finalizarRuta() {
-            if (!confirm("¿Finalizar la jornada? No podrás modificar los estados después.")) return;
+            if (!await ecoConfirm("¿Finalizar la jornada? No podrás modificar los estados después.", "Finalizar Jornada", { confirmText: "Finalizar", cancelText: "Volver", danger: false })) return;
             showLoader(true);
             try {
                 const baseUrl = window.location.port === '5500' ? 'http://localhost:8080' : '';

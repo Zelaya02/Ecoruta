@@ -53,12 +53,18 @@ public class Main {
         String username;
         String rol;
         int userId;
+        Integer choferId;
 
         UserSession(long creationTime, String username, String rol, int userId) {
+            this(creationTime, username, rol, userId, null);
+        }
+
+        UserSession(long creationTime, String username, String rol, int userId, Integer choferId) {
             this.creationTime = creationTime;
             this.username = username;
             this.rol = rol;
             this.userId = userId;
+            this.choferId = choferId;
         }
     }
 
@@ -258,6 +264,22 @@ public class Main {
             try { stmt.executeUpdate("ALTER TABLE denuncias ADD CONSTRAINT fk_denuncias_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL"); } catch (SQLException ignored) {}
             try { stmt.executeUpdate("ALTER TABLE denuncias ADD CONSTRAINT fk_denuncias_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL"); } catch (SQLException ignored) {}
             try { stmt.executeUpdate("ALTER TABLE denuncias ADD CONSTRAINT fk_denuncias_ruta FOREIGN KEY (ruta_token) REFERENCES rutas_generadas(token) ON DELETE SET NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS chofer_id INTEGER"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE denuncias ADD COLUMN IF NOT EXISTS chofer_id INTEGER"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE denuncias ADD COLUMN IF NOT EXISTS cuadrilla TEXT"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE denuncias ADD COLUMN IF NOT EXISTS asignado_a TEXT"); } catch (SQLException ignored) {}
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS alertas_operativas (" +
+                    "id SERIAL PRIMARY KEY, " +
+                    "tipo TEXT NOT NULL, " +
+                    "descripcion TEXT, " +
+                    "chofer_id INTEGER, " +
+                    "chofer_nombre TEXT, " +
+                    "denuncia_id INTEGER, " +
+                    "denuncia_ticket TEXT, " +
+                    "latitud DOUBLE PRECISION, " +
+                    "longitud DOUBLE PRECISION, " +
+                    "estado TEXT DEFAULT 'activa', " +
+                    "fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
 
             System.out.println("✅ Esquema de base de datos verificado/creado con relaciones.");
             
@@ -384,6 +406,8 @@ public class Main {
         server.createContext("/api/kml/exportar", new KmlExportHandler());
         server.createContext("/api/admin/usuarios", new AdminUsuariosHandler());
         server.createContext("/api/denuncias", new DenunciasHandler());
+        server.createContext("/api/denuncias/asignar-punto", new DenunciasAsignarPuntoHandler());
+        server.createContext("/api/alertas", new AlertasHandler());
 
         server.setExecutor(null);
         server.start();
@@ -495,11 +519,17 @@ public class Main {
                 return;
             }
 
+            boolean manager = canManageRutas(exchange);
+
             if ("GET".equals(exchange.getRequestMethod())) {
                 try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                    String sql = "SELECT * FROM clientes WHERE activo = true AND usuario_id = ? ORDER BY id DESC";
+                    String sql = manager
+                            ? "SELECT * FROM clientes WHERE activo = true ORDER BY id DESC"
+                            : "SELECT * FROM clientes WHERE activo = true AND usuario_id = ? ORDER BY id DESC";
                     PreparedStatement stmt = conn.prepareStatement(sql);
-                    stmt.setInt(1, userId);
+                    if (!manager) {
+                        stmt.setInt(1, userId);
+                    }
                     ResultSet rs = stmt.executeQuery();
 
                     List<Map<String, Object>> clientes = new ArrayList<>();
@@ -564,7 +594,9 @@ public class Main {
                             sendResponse(exchange, 201, gson.toJson(respCli));
                         } else {
                             int id = ((Double) req.get("id")).intValue();
-                            String sql = "UPDATE clientes SET nombre=?, tipo_cliente=?, latitud=?, longitud=?, ciudad=?, cadena=? WHERE id=? AND usuario_id=?";
+                            String sql = manager
+                                    ? "UPDATE clientes SET nombre=?, tipo_cliente=?, latitud=?, longitud=?, ciudad=?, cadena=? WHERE id=?"
+                                    : "UPDATE clientes SET nombre=?, tipo_cliente=?, latitud=?, longitud=?, ciudad=?, cadena=? WHERE id=? AND usuario_id=?";
                             PreparedStatement pstmt = conn.prepareStatement(sql);
                             pstmt.setString(1, nombre);
                             pstmt.setString(2, tipo);
@@ -573,7 +605,9 @@ public class Main {
                             pstmt.setString(5, ciudad);
                             pstmt.setString(6, cadena);
                             pstmt.setInt(7, id);
-                            pstmt.setInt(8, userId);
+                            if (!manager) {
+                                pstmt.setInt(8, userId);
+                            }
                             pstmt.executeUpdate();
                             sendResponse(exchange, 200, "{\"status\":\"updated\"}");
                         }
@@ -592,15 +626,20 @@ public class Main {
                     int id = Integer.parseInt(query.split("id=")[1].split("&")[0]);
 
                     try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                        String sql = "UPDATE clientes SET activo = false WHERE id = ? AND usuario_id = ?";
+                        String sql = manager
+                                ? "UPDATE clientes SET activo = false WHERE id = ?"
+                                : "UPDATE clientes SET activo = false WHERE id = ? AND usuario_id = ?";
                         PreparedStatement pstmt = conn.prepareStatement(sql);
                         pstmt.setInt(1, id);
-                        pstmt.setInt(2, userId);
+                        if (!manager) {
+                            pstmt.setInt(2, userId);
+                        }
                         pstmt.executeUpdate();
                         sendResponse(exchange, 200, "{\"status\":\"deleted\"}");
                     }
                 } catch (Exception e) {
-                    e.printStackTrace(); sendError(exchange, 500, "Error interno del servidor");
+                    e.printStackTrace();
+                    sendError(exchange, 500, "Error interno del servidor");
                 }
             } else {
                 exchange.sendResponseHeaders(405, -1);
@@ -672,9 +711,14 @@ public class Main {
                     Map<String, Integer> reglasActivas = new HashMap<>();
                     if (usarReglas) {
                         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                            String sqlReg = "SELECT categoria, limite_por_movil FROM reglas_ruteo WHERE activo = true AND usuario_id = ?";
+                            boolean manager = canManageRutas(exchange);
+                            String sqlReg = manager
+                                    ? "SELECT categoria, limite_por_movil FROM reglas_ruteo WHERE activo = true"
+                                    : "SELECT categoria, limite_por_movil FROM reglas_ruteo WHERE activo = true AND usuario_id = ?";
                             PreparedStatement stmtReg = conn.prepareStatement(sqlReg);
-                            stmtReg.setInt(1, userId);
+                            if (!manager) {
+                                stmtReg.setInt(1, userId);
+                            }
                             ResultSet rsReg = stmtReg.executeQuery();
                             while (rsReg.next()) {
                                 reglasActivas.put(rsReg.getString("categoria").toLowerCase(),
@@ -741,6 +785,12 @@ public class Main {
                                 cmap.put("latitud", c.lat);
                                 cmap.put("longitud", c.lon);
                                 cmap.put("distancia_siguiente", Math.round(dist * 100.0) / 100.0);
+                                boolean esDen = (c.tipo != null && "denuncia".equalsIgnoreCase(c.tipo))
+                                        || (c.nombre != null && c.nombre.toLowerCase().startsWith("denuncia"));
+                                if (esDen) {
+                                    cmap.put("es_denuncia", true);
+                                    cmap.put("tipo", "denuncia");
+                                }
                                 clientesJson.add(cmap);
                             }
 
@@ -864,37 +914,89 @@ public class Main {
 
             if ("GET".equals(exchange.getRequestMethod())) {
                 String query = exchange.getRequestURI().getQuery();
-                if (query == null || !query.contains("token=")) {
-                    sendError(exchange, 400, "Token requerido");
-                    return;
+                String token = null;
+                Integer choferId = null;
+
+                if (query != null && query.contains("token=")) {
+                    token = query.split("token=")[1].split("&")[0];
                 }
-                String token = query.split("token=")[1].split("&")[0];
+                if (query != null && query.contains("chofer_id=")) {
+                    try {
+                        choferId = Integer.parseInt(query.split("chofer_id=")[1].split("&")[0]);
+                    } catch (Exception ignored) {}
+                }
+
+                // Si no hay token explicito ni chofer_id en URL, detectar chofer por sesion
+                if ((token == null || token.isEmpty()) && choferId == null) {
+                    choferId = getChoferIdFromSession(exchange);
+                    if (choferId == null) {
+                        String uName = getUsernameFromSession(exchange);
+                        if (uName != null) {
+                            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                                try (PreparedStatement psC = conn.prepareStatement("SELECT id FROM choferes WHERE LOWER(nombre) = LOWER(?) OR LOWER(nombre) LIKE LOWER(?) LIMIT 1")) {
+                                    psC.setString(1, uName);
+                                    psC.setString(2, "%" + uName + "%");
+                                    ResultSet rsC = psC.executeQuery();
+                                    if (rsC.next()) choferId = rsC.getInt(1);
+                                }
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
 
                 try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                    String sql = "SELECT * FROM rutas_generadas WHERE token = ?";
-                    PreparedStatement pstmt = conn.prepareStatement(sql);
-                    pstmt.setString(1, token);
-                    ResultSet rs = pstmt.executeQuery();
+                    PreparedStatement pstmt;
+                    if (token != null && !token.isEmpty()) {
+                        String sql = "SELECT * FROM rutas_generadas WHERE token = ?";
+                        pstmt = conn.prepareStatement(sql);
+                        pstmt.setString(1, token);
+                    } else if (choferId != null) {
+                        String sql = "SELECT * FROM rutas_generadas WHERE chofer_id = ? AND estado = 'en_curso' ORDER BY fecha DESC LIMIT 1";
+                        pstmt = conn.prepareStatement(sql);
+                        pstmt.setInt(1, choferId);
+                    } else {
+                        sendError(exchange, 400, "Token o chofer_id requerido");
+                        return;
+                    }
 
-                    if (rs.next()) {
+                    ResultSet rs = pstmt.executeQuery();
+                    // Si se busca por chofer y no hay ruta en_curso, buscar la ultima (incluso finalizada)
+                    if (!rs.next() && choferId != null && (token == null || token.isEmpty())) {
+                        String sqlLast = "SELECT * FROM rutas_generadas WHERE chofer_id = ? ORDER BY fecha DESC LIMIT 1";
+                        PreparedStatement pstmtLast = conn.prepareStatement(sqlLast);
+                        pstmtLast.setInt(1, choferId);
+                        rs = pstmtLast.executeQuery();
+                    }
+
+                    if (rs != null && (rs.isFirst() || rs.next())) {
+                        String actualToken = rs.getString("token");
                         java.sql.Timestamp fechaRuta = rs.getTimestamp("fecha");
                         if (fechaRuta != null
-                                && (System.currentTimeMillis() - fechaRuta.getTime()) > 2L * 24 * 60 * 60 * 1000) {
-                            sendError(exchange, 403, "Esta ruta ha expirado (han pasado más de 2 días).");
+                                && (System.currentTimeMillis() - fechaRuta.getTime()) > 7L * 24 * 60 * 60 * 1000) {
+                            sendError(exchange, 403, "Esta ruta ha expirado.");
                             return;
                         }
 
                         Map<String, Object> ruta = new HashMap<>();
+                        ruta.put("token", actualToken);
                         ruta.put("movil", rs.getInt("movil_numero"));
-
                         ruta.put("distancia_total", rs.getDouble("distancia_total"));
                         ruta.put("tiempo_estimado", rs.getInt("tiempo_estimado"));
+                        String estadoRuta = rs.getString("estado");
+                        ruta.put("estado", estadoRuta != null ? estadoRuta : "en_curso");
+                        ruta.put("finalizada", "finalizada".equalsIgnoreCase(estadoRuta));
+                        ruta.put("chofer_id", rs.getInt("chofer_id"));
+                        ruta.put("vehiculo_id", rs.getInt("vehiculo_id"));
+                        ruta.put("chofer_nombre", rs.getString("chofer_nombre"));
+                        ruta.put("vehiculo_nombre", rs.getString("vehiculo_nombre"));
+
                         List<Map<String, Object>> clientes = gson.fromJson(rs.getString("clientes_json"), List.class);
+                        if (clientes == null) clientes = new ArrayList<>();
 
                         // Agregar estados actuales de entregas
                         String sql2 = "SELECT cliente_id, estado, observacion FROM entregas WHERE ruta_token = ?";
                         PreparedStatement pstmt2 = conn.prepareStatement(sql2);
-                        pstmt2.setString(1, token);
+                        pstmt2.setString(1, actualToken);
                         ResultSet rs2 = pstmt2.executeQuery();
                         Map<Integer, String> estados = new HashMap<>();
                         Map<Integer, String> obs = new HashMap<>();
@@ -903,24 +1005,59 @@ public class Main {
                             obs.put(rs2.getInt("cliente_id"), rs2.getString("observacion"));
                         }
 
+                        // Obtener detalles de denuncias vinculadas a esta ruta o cliente
+                        Map<Integer, Map<String, Object>> denMap = new HashMap<>();
+                        try (PreparedStatement pD = conn.prepareStatement("SELECT id, ticket, categoria, barrio, descripcion, cliente_id, foto_url FROM denuncias WHERE ruta_token = ? OR chofer_id = ?")) {
+                            pD.setString(1, actualToken);
+                            pD.setInt(2, rs.getInt("chofer_id"));
+                            ResultSet rsD = pD.executeQuery();
+                            while (rsD.next()) {
+                                int cId = rsD.getInt("cliente_id");
+                                if (cId > 0) {
+                                    Map<String, Object> dm = new HashMap<>();
+                                    dm.put("id", rsD.getInt("id"));
+                                    dm.put("ticket", rsD.getString("ticket"));
+                                    dm.put("categoria", rsD.getString("categoria"));
+                                    dm.put("barrio", rsD.getString("barrio"));
+                                    dm.put("descripcion", rsD.getString("descripcion"));
+                                    dm.put("foto_url", rsD.getString("foto_url"));
+                                    denMap.put(cId, dm);
+                                }
+                            }
+                        } catch (Exception ignored) {}
+
                         for (Map<String, Object> c : clientes) {
                             int cid = ((Double) c.get("id")).intValue();
                             c.put("estado", estados.getOrDefault(cid, "pendiente"));
                             c.put("observacion", obs.getOrDefault(cid, ""));
+
+                            String cNom = (String) c.get("nombre");
+                            boolean isDen = Boolean.TRUE.equals(c.get("es_denuncia"))
+                                    || "denuncia".equalsIgnoreCase((String) c.get("tipo"))
+                                    || (cNom != null && cNom.toLowerCase().startsWith("denuncia"))
+                                    || denMap.containsKey(cid);
+
+                            if (isDen) {
+                                c.put("es_denuncia", true);
+                                c.put("tipo", "denuncia");
+                                if (denMap.containsKey(cid)) {
+                                    Map<String, Object> dm = denMap.get(cid);
+                                    if (!c.containsKey("ticket") || c.get("ticket") == null) c.put("ticket", dm.get("ticket"));
+                                    if (!c.containsKey("categoria") || c.get("categoria") == null) c.put("categoria", dm.get("categoria"));
+                                    if (!c.containsKey("descripcion") || c.get("descripcion") == null) c.put("descripcion", dm.get("descripcion"));
+                                    if (!c.containsKey("foto_url") || c.get("foto_url") == null) c.put("foto_url", dm.get("foto_url"));
+                                }
+                            }
                         }
 
                         ruta.put("clientes", clientes);
-                        ruta.put("chofer_id", rs.getInt("chofer_id"));
-                        ruta.put("vehiculo_id", rs.getInt("vehiculo_id"));
-                        ruta.put("chofer_nombre", rs.getString("chofer_nombre"));
-                        ruta.put("vehiculo_nombre", rs.getString("vehiculo_nombre"));
                         sendResponse(exchange, 200, gson.toJson(ruta));
                     } else {
                         sendError(exchange, 404, "Ruta no encontrada");
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
-                    sendError(exchange, 500, "Error interno del servidor");
+                    sendError(exchange, 500, "Error interno del servidor: " + e.getMessage());
                 }
             }
         }
@@ -1018,20 +1155,41 @@ public class Main {
                             .collect(Collectors.joining("\n"));
                     Map<String, Object> req = gson.fromJson(body, Map.class);
                     String token = (String) req.get("token");
+                    if (token == null || token.isEmpty()) {
+                        sendError(exchange, 400, "Token requerido");
+                        return;
+                    }
 
                     Integer userId = getUserIdFromSession(exchange);
-                    if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
+                    boolean manager = canManageRutas(exchange);
+                    Integer choferId = getChoferIdFromSession(exchange);
 
                     try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                        String sql = "UPDATE rutas_generadas SET estado = 'finalizada' WHERE token = ? AND usuario_id = ?";
-                        PreparedStatement pstmt = conn.prepareStatement(sql);
-                        pstmt.setString(1, token);
-                        pstmt.setInt(2, userId);
+                        String sql;
+                        PreparedStatement pstmt;
+                        if (manager || userId == null) {
+                            // Si es gestor o llamada desde el enlace publico de ruta con token
+                            sql = "UPDATE rutas_generadas SET estado = 'finalizada' WHERE token = ?";
+                            pstmt = conn.prepareStatement(sql);
+                            pstmt.setString(1, token);
+                        } else if (choferId != null) {
+                            sql = "UPDATE rutas_generadas SET estado = 'finalizada' WHERE token = ? AND (chofer_id = ? OR usuario_id = ?)";
+                            pstmt = conn.prepareStatement(sql);
+                            pstmt.setString(1, token);
+                            pstmt.setInt(2, choferId);
+                            pstmt.setInt(3, userId);
+                        } else {
+                            sql = "UPDATE rutas_generadas SET estado = 'finalizada' WHERE token = ? AND usuario_id = ?";
+                            pstmt = conn.prepareStatement(sql);
+                            pstmt.setString(1, token);
+                            pstmt.setInt(2, userId);
+                        }
+
                         int updated = pstmt.executeUpdate();
                         if (updated > 0) {
-                            sendResponse(exchange, 200, "{\"status\":\"ok\"}");
+                            sendResponse(exchange, 200, "{\"status\":\"ok\",\"message\":\"Ruta finalizada exitosamente\"}");
                         } else {
-                            sendError(exchange, 404, "Ruta no encontrada");
+                            sendError(exchange, 404, "Ruta no encontrada o sin permisos");
                         }
                     }
                 } catch (Exception e) {
@@ -1055,12 +1213,17 @@ public class Main {
             }
             Integer userId = getUserIdFromSession(exchange);
             if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
+            boolean manager = canManageRutas(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
                 try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                     // Obtener las ultimas 100 rutas generadas
-                    String sql = "SELECT token, movil_numero, clientes_json, distancia_total, chofer_nombre, vehiculo_nombre, fecha, estado FROM rutas_generadas WHERE usuario_id = ? ORDER BY fecha DESC LIMIT 100";
+                    String sql = manager
+                            ? "SELECT token, movil_numero, clientes_json, distancia_total, chofer_nombre, vehiculo_nombre, fecha, estado FROM rutas_generadas ORDER BY fecha DESC LIMIT 100"
+                            : "SELECT token, movil_numero, clientes_json, distancia_total, chofer_nombre, vehiculo_nombre, fecha, estado FROM rutas_generadas WHERE usuario_id = ? ORDER BY fecha DESC LIMIT 100";
                     PreparedStatement stmt = conn.prepareStatement(sql);
-                    stmt.setInt(1, userId);
+                    if (!manager) {
+                        stmt.setInt(1, userId);
+                    }
                     ResultSet rs = stmt.executeQuery();
                     List<Map<String, Object>> rutasList = new ArrayList<>();
                     
@@ -1106,10 +1269,14 @@ public class Main {
 
                     try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                         // Verificar antiguedad de la ruta
-                        PreparedStatement checkStmt = conn.prepareStatement(
-                            "SELECT fecha FROM rutas_generadas WHERE token = ? AND usuario_id = ?");
+                        String checkSql = manager
+                                ? "SELECT fecha FROM rutas_generadas WHERE token = ?"
+                                : "SELECT fecha FROM rutas_generadas WHERE token = ? AND usuario_id = ?";
+                        PreparedStatement checkStmt = conn.prepareStatement(checkSql);
                         checkStmt.setString(1, token);
-                        checkStmt.setInt(2, userId);
+                        if (!manager) {
+                            checkStmt.setInt(2, userId);
+                        }
                         ResultSet rs = checkStmt.executeQuery();
                         
                         if (!rs.next()) {
@@ -1127,8 +1294,9 @@ public class Main {
                                 sendError(exchange, 403, "REQUIERE_PASSWORD");
                                 return;
                             }
-                            // Verificar contrasena contra la BD
-                            Usuario usuario = usuarioRepo.login("admin", password);
+                            // Verificar contrasena contra la BD del usuario actual en sesion
+                            String currentUsername = getUsernameFromSession(exchange);
+                            Usuario usuario = usuarioRepo.login(currentUsername != null ? currentUsername : "admin", password);
                             if (usuario == null) {
                                 sendError(exchange, 403, "Contrasena incorrecta");
                                 return;
@@ -1143,10 +1311,14 @@ public class Main {
                         }
 
                         // Eliminar la ruta
-                        PreparedStatement deleteStmt = conn.prepareStatement(
-                            "DELETE FROM rutas_generadas WHERE token = ? AND usuario_id = ?");
+                        String delSql = manager
+                                ? "DELETE FROM rutas_generadas WHERE token = ?"
+                                : "DELETE FROM rutas_generadas WHERE token = ? AND usuario_id = ?";
+                        PreparedStatement deleteStmt = conn.prepareStatement(delSql);
                         deleteStmt.setString(1, token);
-                        deleteStmt.setInt(2, userId);
+                        if (!manager) {
+                            deleteStmt.setInt(2, userId);
+                        }
                         int deleted = deleteStmt.executeUpdate();
                         
                         if (deleted > 0) {
@@ -1178,11 +1350,16 @@ public class Main {
             }
             Integer userId = getUserIdFromSession(exchange);
             if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
+            boolean manager = canManageRutas(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
                 try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                    String sql = "SELECT * FROM reglas_ruteo WHERE usuario_id = ? ORDER BY categoria";
+                    String sql = manager
+                            ? "SELECT * FROM reglas_ruteo ORDER BY categoria"
+                            : "SELECT * FROM reglas_ruteo WHERE usuario_id = ? ORDER BY categoria";
                     PreparedStatement stmt = conn.prepareStatement(sql);
-                    stmt.setInt(1, userId);
+                    if (!manager) {
+                        stmt.setInt(1, userId);
+                    }
                     ResultSet rs = stmt.executeQuery();
                     List<Regla> reglas = new ArrayList<>();
                     while (rs.next()) {
@@ -1211,17 +1388,23 @@ public class Main {
                                 return;
                             }
 
-                            PreparedStatement checkStmt = conn.prepareStatement("SELECT id FROM reglas_ruteo WHERE categoria = ? AND usuario_id = ?");
+                            String checkSql = manager
+                                    ? "SELECT id FROM reglas_ruteo WHERE LOWER(categoria) = LOWER(?)"
+                                    : "SELECT id FROM reglas_ruteo WHERE LOWER(categoria) = LOWER(?) AND usuario_id = ?";
+                            PreparedStatement checkStmt = conn.prepareStatement(checkSql);
                             checkStmt.setString(1, cat);
-                            checkStmt.setInt(2, userId);
+                            if (!manager) {
+                                checkStmt.setInt(2, userId);
+                            }
                             ResultSet rsCheck = checkStmt.executeQuery();
                             if (rsCheck.next()) {
-                                PreparedStatement updStmt = conn.prepareStatement("UPDATE reglas_ruteo SET limite_por_movil = ?, activo = ? WHERE categoria = ? AND usuario_id = ?");
+                                int reglaId = rsCheck.getInt("id");
+                                PreparedStatement updStmt = conn.prepareStatement("UPDATE reglas_ruteo SET limite_por_movil = ?, activo = ? WHERE id = ?");
                                 updStmt.setInt(1, lim);
                                 updStmt.setBoolean(2, act);
-                                updStmt.setString(3, cat);
-                                updStmt.setInt(4, userId);
+                                updStmt.setInt(3, reglaId);
                                 updStmt.executeUpdate();
+                                updStmt.close();
                             } else {
                                 PreparedStatement insStmt = conn.prepareStatement("INSERT INTO reglas_ruteo (categoria, limite_por_movil, activo, usuario_id) VALUES (?, ?, ?, ?)");
                                 insStmt.setString(1, cat);
@@ -1229,7 +1412,9 @@ public class Main {
                                 insStmt.setBoolean(3, act);
                                 insStmt.setInt(4, userId);
                                 insStmt.executeUpdate();
+                                insStmt.close();
                             }
+                            checkStmt.close();
                         }
                         sendResponse(exchange, 200, "{\"status\":\"ok\"}");
                     }
@@ -1246,10 +1431,14 @@ public class Main {
                     String cat = java.net.URLDecoder.decode(query.split("categoria=")[1].split("&")[0], "UTF-8")
                             .toLowerCase();
                     try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                        String sql = "DELETE FROM reglas_ruteo WHERE LOWER(categoria) = ? AND usuario_id = ?";
+                        String sql = manager
+                                ? "DELETE FROM reglas_ruteo WHERE LOWER(categoria) = ?"
+                                : "DELETE FROM reglas_ruteo WHERE LOWER(categoria) = ? AND usuario_id = ?";
                         PreparedStatement pstmt = conn.prepareStatement(sql);
                         pstmt.setString(1, cat);
-                        pstmt.setInt(2, userId);
+                        if (!manager) {
+                            pstmt.setInt(2, userId);
+                        }
                         pstmt.executeUpdate();
                         sendResponse(exchange, 200, "{\"status\":\"deleted\"}");
                     }
@@ -1276,18 +1465,29 @@ public class Main {
             Integer userId = getUserIdFromSession(exchange);
             if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
 
+            boolean manager = canManageRutas(exchange);
             try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                 asegurarCategoriasDefault(conn, userId);
 
                 if ("GET".equals(exchange.getRequestMethod())) {
                     List<Map<String, Object>> categorias = new ArrayList<>();
-                    PreparedStatement stmt = conn.prepareStatement("SELECT id, nombre FROM categorias WHERE activo = true AND usuario_id = ? ORDER BY nombre");
-                    stmt.setInt(1, userId);
+                    String catSql = manager
+                            ? "SELECT MIN(id) AS id, nombre FROM categorias WHERE activo = true GROUP BY nombre ORDER BY nombre"
+                            : "SELECT id, nombre FROM categorias WHERE activo = true AND usuario_id = ? ORDER BY nombre";
+                    PreparedStatement stmt = conn.prepareStatement(catSql);
+                    if (!manager) {
+                        stmt.setInt(1, userId);
+                    }
                     ResultSet rs = stmt.executeQuery();
 
                     Map<String, Integer> usos = new HashMap<>();
-                    PreparedStatement usosStmt = conn.prepareStatement("SELECT LOWER(tipo_cliente) AS tc, COUNT(*) FROM clientes WHERE activo = true AND usuario_id = ? AND tipo_cliente IS NOT NULL AND tipo_cliente <> '' GROUP BY LOWER(tipo_cliente)");
-                    usosStmt.setInt(1, userId);
+                    String usosSql = manager
+                            ? "SELECT LOWER(tipo_cliente) AS tc, COUNT(*) FROM clientes WHERE activo = true AND tipo_cliente IS NOT NULL AND tipo_cliente <> '' GROUP BY LOWER(tipo_cliente)"
+                            : "SELECT LOWER(tipo_cliente) AS tc, COUNT(*) FROM clientes WHERE activo = true AND usuario_id = ? AND tipo_cliente IS NOT NULL AND tipo_cliente <> '' GROUP BY LOWER(tipo_cliente)";
+                    PreparedStatement usosStmt = conn.prepareStatement(usosSql);
+                    if (!manager) {
+                        usosStmt.setInt(1, userId);
+                    }
                     ResultSet rsUsos = usosStmt.executeQuery();
                     while (rsUsos.next()) {
                         usos.put(rsUsos.getString("tc"), rsUsos.getInt("count"));
@@ -1314,9 +1514,14 @@ public class Main {
                         sendError(exchange, 400, "El nombre de la categoría es obligatorio");
                         return;
                     }
-                    PreparedStatement check = conn.prepareStatement("SELECT id FROM categorias WHERE LOWER(nombre) = LOWER(?) AND usuario_id = ?");
+                    String checkSql = manager
+                            ? "SELECT id FROM categorias WHERE LOWER(nombre) = LOWER(?)"
+                            : "SELECT id FROM categorias WHERE LOWER(nombre) = LOWER(?) AND usuario_id = ?";
+                    PreparedStatement check = conn.prepareStatement(checkSql);
                     check.setString(1, nombre);
-                    check.setInt(2, userId);
+                    if (!manager) {
+                        check.setInt(2, userId);
+                    }
                     ResultSet rsCheck = check.executeQuery();
                     if (rsCheck.next()) {
                         check.close();
@@ -1348,9 +1553,14 @@ public class Main {
                         sendError(exchange, 400, "El nombre de la categoría es obligatorio");
                         return;
                     }
-                    PreparedStatement find = conn.prepareStatement("SELECT nombre FROM categorias WHERE id = ? AND usuario_id = ?");
+                    String findSql = manager
+                            ? "SELECT nombre FROM categorias WHERE id = ?"
+                            : "SELECT nombre FROM categorias WHERE id = ? AND usuario_id = ?";
+                    PreparedStatement find = conn.prepareStatement(findSql);
                     find.setInt(1, id);
-                    find.setInt(2, userId);
+                    if (!manager) {
+                        find.setInt(2, userId);
+                    }
                     ResultSet rsFind = find.executeQuery();
                     if (!rsFind.next()) {
                         find.close();
@@ -1361,10 +1571,15 @@ public class Main {
                     find.close();
 
                     if (!nombreAnterior.equalsIgnoreCase(nombre)) {
-                        PreparedStatement check = conn.prepareStatement("SELECT id FROM categorias WHERE LOWER(nombre) = LOWER(?) AND id <> ? AND usuario_id = ?");
+                        String checkSql = manager
+                                ? "SELECT id FROM categorias WHERE LOWER(nombre) = LOWER(?) AND id <> ?"
+                                : "SELECT id FROM categorias WHERE LOWER(nombre) = LOWER(?) AND id <> ? AND usuario_id = ?";
+                        PreparedStatement check = conn.prepareStatement(checkSql);
                         check.setString(1, nombre);
                         check.setInt(2, id);
-                        check.setInt(3, userId);
+                        if (!manager) {
+                            check.setInt(3, userId);
+                        }
                         ResultSet rsCheck = check.executeQuery();
                         if (rsCheck.next()) {
                             check.close();
@@ -1373,24 +1588,33 @@ public class Main {
                         }
                         check.close();
 
-                        PreparedStatement updCat = conn.prepareStatement("UPDATE categorias SET nombre = ? WHERE id = ? AND usuario_id = ?");
+                        PreparedStatement updCat = conn.prepareStatement("UPDATE categorias SET nombre = ? WHERE id = ?");
                         updCat.setString(1, nombre);
                         updCat.setInt(2, id);
-                        updCat.setInt(3, userId);
                         updCat.executeUpdate();
                         updCat.close();
 
-                        PreparedStatement updClientes = conn.prepareStatement("UPDATE clientes SET tipo_cliente = ? WHERE LOWER(tipo_cliente) = LOWER(?) AND usuario_id = ?");
+                        String updCliSql = manager
+                                ? "UPDATE clientes SET tipo_cliente = ? WHERE LOWER(tipo_cliente) = LOWER(?)"
+                                : "UPDATE clientes SET tipo_cliente = ? WHERE LOWER(tipo_cliente) = LOWER(?) AND usuario_id = ?";
+                        PreparedStatement updClientes = conn.prepareStatement(updCliSql);
                         updClientes.setString(1, nombre);
                         updClientes.setString(2, nombreAnterior);
-                        updClientes.setInt(3, userId);
+                        if (!manager) {
+                            updClientes.setInt(3, userId);
+                        }
                         updClientes.executeUpdate();
                         updClientes.close();
 
-                        PreparedStatement updReglas = conn.prepareStatement("UPDATE reglas_ruteo SET categoria = ? WHERE LOWER(categoria) = LOWER(?) AND usuario_id = ?");
+                        String updRegSql = manager
+                                ? "UPDATE reglas_ruteo SET categoria = ? WHERE LOWER(categoria) = LOWER(?)"
+                                : "UPDATE reglas_ruteo SET categoria = ? WHERE LOWER(categoria) = LOWER(?) AND usuario_id = ?";
+                        PreparedStatement updReglas = conn.prepareStatement(updRegSql);
                         updReglas.setString(1, nombre);
                         updReglas.setString(2, nombreAnterior);
-                        updReglas.setInt(3, userId);
+                        if (!manager) {
+                            updReglas.setInt(3, userId);
+                        }
                         updReglas.executeUpdate();
                         updReglas.close();
                     }
@@ -1406,9 +1630,14 @@ public class Main {
                     }
                     int id = Integer.parseInt(query.split("id=")[1].split("&")[0]);
 
-                    PreparedStatement find = conn.prepareStatement("SELECT nombre FROM categorias WHERE id = ? AND usuario_id = ?");
+                    String findSql = manager
+                            ? "SELECT nombre FROM categorias WHERE id = ?"
+                            : "SELECT nombre FROM categorias WHERE id = ? AND usuario_id = ?";
+                    PreparedStatement find = conn.prepareStatement(findSql);
                     find.setInt(1, id);
-                    find.setInt(2, userId);
+                    if (!manager) {
+                        find.setInt(2, userId);
+                    }
                     ResultSet rsFind = find.executeQuery();
                     if (!rsFind.next()) {
                         find.close();
@@ -1418,9 +1647,14 @@ public class Main {
                     String nombre = rsFind.getString("nombre");
                     find.close();
 
-                    PreparedStatement countStmt = conn.prepareStatement("SELECT COUNT(*) FROM clientes WHERE activo = true AND LOWER(tipo_cliente) = LOWER(?) AND usuario_id = ?");
+                    String countSql = manager
+                            ? "SELECT COUNT(*) FROM clientes WHERE activo = true AND LOWER(tipo_cliente) = LOWER(?)"
+                            : "SELECT COUNT(*) FROM clientes WHERE activo = true AND LOWER(tipo_cliente) = LOWER(?) AND usuario_id = ?";
+                    PreparedStatement countStmt = conn.prepareStatement(countSql);
                     countStmt.setString(1, nombre);
-                    countStmt.setInt(2, userId);
+                    if (!manager) {
+                        countStmt.setInt(2, userId);
+                    }
                     ResultSet rsCount = countStmt.executeQuery();
                     rsCount.next();
                     int enUso = rsCount.getInt(1);
@@ -1434,15 +1668,13 @@ public class Main {
                         return;
                     }
 
-                    PreparedStatement delCat = conn.prepareStatement("DELETE FROM categorias WHERE id = ? AND usuario_id = ?");
+                    PreparedStatement delCat = conn.prepareStatement("DELETE FROM categorias WHERE id = ?");
                     delCat.setInt(1, id);
-                    delCat.setInt(2, userId);
                     delCat.executeUpdate();
                     delCat.close();
 
-                    PreparedStatement delRegla = conn.prepareStatement("DELETE FROM reglas_ruteo WHERE LOWER(categoria) = LOWER(?) AND usuario_id = ?");
+                    PreparedStatement delRegla = conn.prepareStatement("DELETE FROM reglas_ruteo WHERE LOWER(categoria) = LOWER(?)");
                     delRegla.setString(1, nombre);
-                    delRegla.setInt(2, userId);
                     delRegla.executeUpdate();
                     delRegla.close();
 
@@ -1471,6 +1703,7 @@ public class Main {
             }
             Integer userId = getUserIdFromSession(exchange);
             if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
+            boolean manager = canManageRutas(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
                 String query = exchange.getRequestURI().getQuery();
                 String periodo = "dia";
@@ -1478,7 +1711,7 @@ public class Main {
                     periodo = query.split("periodo=")[1].split("&")[0];
                 }
 
-String dateFilter = switch (periodo) {
+                String dateFilter = switch (periodo) {
                     case "semana" -> "COALESCE(r.fecha, CURRENT_TIMESTAMP) >= CURRENT_DATE - INTERVAL '7 days'";
                     case "mes" -> "COALESCE(r.fecha, CURRENT_TIMESTAMP) >= CURRENT_DATE - INTERVAL '30 days'";
                     default -> "CAST(COALESCE(r.fecha, CURRENT_TIMESTAMP) AS DATE) = CURRENT_DATE";
@@ -1487,9 +1720,11 @@ String dateFilter = switch (periodo) {
                 try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                     // Totales por Estado
                     String sql = "SELECT e.estado, COUNT(*) as cantidad FROM entregas e JOIN rutas_generadas r ON e.ruta_token = r.token WHERE "
-                            + dateFilter + " AND r.usuario_id = ? GROUP BY e.estado";
+                            + dateFilter + (manager ? "" : " AND r.usuario_id = ?") + " GROUP BY e.estado";
                     PreparedStatement stmt = conn.prepareStatement(sql);
-                    stmt.setInt(1, userId);
+                    if (!manager) {
+                        stmt.setInt(1, userId);
+                    }
                     ResultSet rs = stmt.executeQuery();
 
                     int entregados = 0, pendientes = 0, rechazados = 0;
@@ -1522,10 +1757,12 @@ String dateFilter = switch (periodo) {
                             "JOIN entregas e ON r.token = e.ruta_token " +
                             "LEFT JOIN choferes ch ON r.chofer_id = ch.id " +
                             "LEFT JOIN vehiculos v ON r.vehiculo_id = v.id " +
-                            "WHERE " + dateFilter + " AND r.usuario_id = ? " +
+                            "WHERE " + dateFilter + (manager ? " " : " AND r.usuario_id = ? ") +
                             "GROUP BY r.movil_numero, ch.nombre, v.nombre";
                     PreparedStatement stmtRend = conn.prepareStatement(sqlRend);
-                    stmtRend.setInt(1, userId);
+                    if (!manager) {
+                        stmtRend.setInt(1, userId);
+                    }
                     ResultSet rsRend = stmtRend.executeQuery();
                     List<Map<String, Object>> rendimientos = new ArrayList<>();
                     while (rsRend.next()) {
@@ -1543,9 +1780,12 @@ String dateFilter = switch (periodo) {
                     String sqlHist = "SELECT CAST(r.fecha AS DATE) as fecha_dia, " +
                             "SUM(CASE WHEN e.estado = 'entregado' THEN 1 ELSE 0 END) as ent " +
                             "FROM rutas_generadas r JOIN entregas e ON r.token = e.ruta_token " +
-                            "WHERE " + dateFilter + " AND r.usuario_id = ? GROUP BY CAST(r.fecha AS DATE) ORDER BY fecha_dia ASC";
+                            "WHERE " + dateFilter + (manager ? " " : " AND r.usuario_id = ? ") +
+                            "GROUP BY CAST(r.fecha AS DATE) ORDER BY fecha_dia ASC";
                     PreparedStatement stmtHist = conn.prepareStatement(sqlHist);
-                    stmtHist.setInt(1, userId);
+                    if (!manager) {
+                        stmtHist.setInt(1, userId);
+                    }
                     ResultSet rsHist = stmtHist.executeQuery();
                     List<Map<String, Object>> historial = new ArrayList<>();
                     while (rsHist.next()) {
@@ -1578,6 +1818,7 @@ String dateFilter = switch (periodo) {
             }
             Integer userId = getUserIdFromSession(exchange);
             if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
+            boolean manager = canManageRutas(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
                 try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                     String sql = "SELECT e.id, c.nombre as cliente, e.estado, e.observacion, e.fecha_actualizacion, r.movil_numero, "
@@ -1588,10 +1829,12 @@ String dateFilter = switch (periodo) {
                             "JOIN rutas_generadas r ON e.ruta_token = r.token " +
                             "LEFT JOIN choferes ch ON r.chofer_id = ch.id " +
                             "LEFT JOIN vehiculos v ON r.vehiculo_id = v.id " +
-                            "WHERE e.estado != 'pendiente' AND r.usuario_id = ? " +
+                            "WHERE e.estado != 'pendiente' " + (manager ? "" : "AND r.usuario_id = ? ") +
                             "ORDER BY e.fecha_actualizacion DESC LIMIT 50";
                     PreparedStatement stmt = conn.prepareStatement(sql);
-                    stmt.setInt(1, userId);
+                    if (!manager) {
+                        stmt.setInt(1, userId);
+                    }
                     ResultSet rs = stmt.executeQuery();
 
                     List<Map<String, Object>> reportes = new ArrayList<>();
@@ -1674,12 +1917,15 @@ String dateFilter = switch (periodo) {
             d.put("cliente_id", rs.getObject("cliente_id"));
             d.put("ruta_token", rs.getString("ruta_token"));
             d.put("observacion_cierre", rs.getString("observacion_cierre"));
+            d.put("chofer_id", rs.getObject("chofer_id"));
+            d.put("cuadrilla", rs.getString("cuadrilla"));
+            d.put("asignado_a", rs.getString("asignado_a"));
             d.put("fecha_creacion", rs.getTimestamp("fecha_creacion") != null ? rs.getTimestamp("fecha_creacion").toString() : null);
             d.put("fecha_cierre", rs.getTimestamp("fecha_cierre") != null ? rs.getTimestamp("fecha_cierre").toString() : null);
             return d;
         }
 
-        /** GET /api/denuncias?ticket=ECO-... (publico) | ?estado=&barrio=&mine=1 (auth) */
+        /** GET /api/denuncias?ticket=ECO-... (publico) | ?estado=&barrio=&mine=1 (auth/publico) */
         private void handleList(HttpExchange exchange) throws IOException, SQLException {
             Map<String, String> qp = queryParams(exchange);
             try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
@@ -1698,16 +1944,27 @@ String dateFilter = switch (periodo) {
                     }
                     return;
                 }
-                if (!isAuthorized(exchange)) { sendError(exchange, 401, "No autorizado"); return; }
                 Integer userId = getUserIdFromSession(exchange);
-                String rol = getRolFromSession(exchange);
                 boolean manager = canManageRutas(exchange);
+                boolean chofer = isChofer(exchange);
+                Integer sesionChoferId = getChoferIdFromSession(exchange);
+                String sesionUsername = getUsernameFromSession(exchange);
+
                 StringBuilder sql = new StringBuilder("SELECT * FROM denuncias WHERE 1=1");
                 List<Object> params = new ArrayList<>();
-                if (!manager) {
-                    sql.append(" AND usuario_id = ?");
-                    params.add(userId);
-                } else if ("1".equals(qp.get("mine"))) {
+
+                if (chofer && !manager) {
+                    if (sesionChoferId != null) {
+                        sql.append(" AND (chofer_id = ? OR cuadrilla ILIKE ? OR asignado_a ILIKE ?)");
+                        params.add(sesionChoferId);
+                        params.add("%" + sesionUsername + "%");
+                        params.add("%" + sesionUsername + "%");
+                    } else {
+                        sql.append(" AND (cuadrilla ILIKE ? OR asignado_a ILIKE ?)");
+                        params.add("%" + sesionUsername + "%");
+                        params.add("%" + sesionUsername + "%");
+                    }
+                } else if (!manager && userId != null && "1".equals(qp.get("mine"))) {
                     sql.append(" AND usuario_id = ?");
                     params.add(userId);
                 }
@@ -1719,19 +1976,42 @@ String dateFilter = switch (periodo) {
                     sql.append(" AND barrio ILIKE ?");
                     params.add("%" + qp.get("barrio") + "%");
                 }
+                if (qp.containsKey("chofer_id") && !qp.get("chofer_id").isEmpty()) {
+                    try {
+                        sql.append(" AND chofer_id = ?");
+                        params.add(Integer.parseInt(qp.get("chofer_id")));
+                    } catch (Exception ignored) {}
+                }
+                if (qp.containsKey("cuadrilla") && !qp.get("cuadrilla").isEmpty()) {
+                    sql.append(" AND (cuadrilla ILIKE ? OR asignado_a ILIKE ?)");
+                    params.add("%" + qp.get("cuadrilla") + "%");
+                    params.add("%" + qp.get("cuadrilla") + "%");
+                }
                 sql.append(" ORDER BY fecha_creacion DESC LIMIT 300");
                 PreparedStatement ps = conn.prepareStatement(sql.toString());
                 for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
                 ResultSet rs = ps.executeQuery();
                 List<Map<String, Object>> out = new ArrayList<>();
-                while (rs.next()) out.add(rowToMap(rs));
+                while (rs.next()) {
+                    Map<String, Object> row = rowToMap(rs);
+                    if (!manager && !chofer) {
+                        row.remove("telefono");
+                    }
+                    out.add(row);
+                }
                 sendResponse(exchange, 200, gson.toJson(out));
             }
         }
 
-        /** POST /api/denuncias (auth: ciudadano/gestor/admin/superadmin) -> pendiente */
+        private String optString(JsonObject json, String key, String def) {
+            if (json.has(key) && !json.get(key).isJsonNull()) {
+                try { return json.get(key).getAsString(); } catch (Exception ignored) {}
+            }
+            return def;
+        }
+
+        /** POST /api/denuncias: crea y persiste en BD siempre (con o sin sesión) */
         private void handleCreate(HttpExchange exchange) throws IOException, SQLException {
-            if (!isAuthorized(exchange)) { sendError(exchange, 401, "No autorizado"); return; }
             Integer userId = getUserIdFromSession(exchange);
             String body = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
                     .lines().collect(Collectors.joining("\n"));
@@ -1739,17 +2019,37 @@ String dateFilter = switch (periodo) {
             try {
                 json = JsonParser.parseString(body).getAsJsonObject();
             } catch (Exception e) { sendError(exchange, 400, "JSON invalido"); return; }
-            String descripcion = json.has("descripcion") ? json.get("descripcion").getAsString().trim() : "";
-            String barrio = json.has("barrio") ? json.get("barrio").getAsString().trim() : "";
+            String descripcion = optString(json, "descripcion", "").trim();
+            String barrio = optString(json, "barrio", "").trim();
             if (descripcion.isEmpty() || barrio.isEmpty()) { sendError(exchange, 400, "descripcion y barrio son obligatorios"); return; }
-            if (!json.has("latitud") || !json.has("longitud")) { sendError(exchange, 400, "latitud y longitud son obligatorias"); return; }
+            if (!json.has("latitud") || json.get("latitud").isJsonNull() || !json.has("longitud") || json.get("longitud").isJsonNull()) {
+                sendError(exchange, 400, "latitud y longitud son obligatorias");
+                return;
+            }
             double lat = json.get("latitud").getAsDouble();
             double lon = json.get("longitud").getAsDouble();
-            String categoria = json.has("categoria") ? json.get("categoria").getAsString() : "VERTEDERO_CLANDESTINO";
-            String direccion = json.has("direccion_referencia") ? json.get("direccion_referencia").getAsString() : "";
-            String telefono = json.has("telefono") ? json.get("telefono").getAsString() : "";
-            String nombre = json.has("nombre_ciudadano") ? json.get("nombre_ciudadano").getAsString() : "";
-            String foto = json.has("foto_url") ? json.get("foto_url").getAsString() : "";
+            String categoria = optString(json, "categoria", "VERTEDERO_CLANDESTINO");
+            String direccion = optString(json, "direccion_referencia", "");
+            String telefono = optString(json, "telefono", "");
+            String nombre = optString(json, "nombre_ciudadano", "");
+            String foto = optString(json, "foto_url", "").trim();
+            if (!foto.isEmpty()) {
+                // Medidas de seguridad: Límite estricto de tamaño (máx 5MB)
+                if (foto.length() > 5 * 1024 * 1024) {
+                    sendError(exchange, 400, "La fotografía excede el tamaño máximo permitido (máx 5MB)");
+                    return;
+                }
+                // Medidas de seguridad: Validar que sea un formato seguro de imagen (JPEG/PNG/WebP o URL)
+                boolean isSafe = foto.startsWith("data:image/jpeg;base64,")
+                        || foto.startsWith("data:image/png;base64,")
+                        || foto.startsWith("data:image/webp;base64,")
+                        || foto.startsWith("http://")
+                        || foto.startsWith("https://");
+                if (!isSafe) {
+                    sendError(exchange, 400, "Formato de fotografía no válido o inseguro");
+                    return;
+                }
+            }
             String fecha = new java.text.SimpleDateFormat("yyyyMMdd").format(new java.util.Date());
             String ticket = "ECO-" + fecha + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
             try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
@@ -1765,7 +2065,11 @@ String dateFilter = switch (periodo) {
                 ps.setDouble(8, lat);
                 ps.setDouble(9, lon);
                 ps.setString(10, foto);
-                ps.setInt(11, userId);
+                if (userId != null) {
+                    ps.setInt(11, userId);
+                } else {
+                    ps.setNull(11, java.sql.Types.INTEGER);
+                }
                 ResultSet rs = ps.executeQuery();
                 int id = rs.next() ? rs.getInt(1) : 0;
                 Map<String, Object> resp = new HashMap<>();
@@ -1776,10 +2080,10 @@ String dateFilter = switch (periodo) {
             }
         }
 
-        /** PUT /api/denuncias (solo gestor/admin/superadmin): cambia estado y vincula cliente/ruta */
+        /** PUT /api/denuncias: cambia estado y vincula cliente/ruta (gestor o chofer) */
         private void handleUpdate(HttpExchange exchange) throws IOException, SQLException {
             if (!isAuthorized(exchange)) { sendError(exchange, 401, "No autorizado"); return; }
-            if (!canManageRutas(exchange)) { sendError(exchange, 403, "Solo gestor o superior"); return; }
+            if (!canManageRutas(exchange) && !isChofer(exchange)) { sendError(exchange, 403, "Solo gestor o chofer asignado"); return; }
             String body = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
                     .lines().collect(Collectors.joining("\n"));
             JsonObject json;
@@ -1797,6 +2101,9 @@ String dateFilter = switch (periodo) {
             Integer clienteId = (json.has("cliente_id") && !json.get("cliente_id").isJsonNull()) ? json.get("cliente_id").getAsInt() : null;
             String rutaToken = (json.has("ruta_token") && !json.get("ruta_token").isJsonNull()) ? json.get("ruta_token").getAsString() : null;
             String obs = (json.has("observacion_cierre") && !json.get("observacion_cierre").isJsonNull()) ? json.get("observacion_cierre").getAsString() : "";
+            Integer choferId = (json.has("chofer_id") && !json.get("chofer_id").isJsonNull()) ? json.get("chofer_id").getAsInt() : null;
+            String cuadrilla = optString(json, "cuadrilla", null);
+            String asignadoA = optString(json, "asignado_a", null);
             try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                 PreparedStatement cur = conn.prepareStatement("SELECT estado FROM denuncias WHERE id = ?");
                 cur.setInt(1, id);
@@ -1804,28 +2111,481 @@ String dateFilter = switch (periodo) {
                 if (!rs.next()) { sendError(exchange, 404, "Denuncia no encontrada"); return; }
                 String actual = rs.getString("estado");
                 if ("cerrada".equals(actual) && "cerrada".equals(nuevoEstado)) { sendError(exchange, 400, "La denuncia ya esta cerrada"); return; }
-                // Transiciones validas: pendiente->en_proceso|rechazada, en_proceso->cerrada|rechazada|pendiente, rechazada->pendiente|en_proceso, cerrada->en_proceso (reapertura)
-                boolean ok = ("pendiente".equals(actual) && ("en_proceso".equals(nuevoEstado) || "rechazada".equals(nuevoEstado)))
-                        || ("en_proceso".equals(actual) && ("cerrada".equals(nuevoEstado) || "rechazada".equals(nuevoEstado) || "pendiente".equals(nuevoEstado)))
+                // Transiciones validas: pendiente->en_proceso|rechazada|pendiente, en_proceso->cerrada|rechazada|pendiente|en_proceso, rechazada->pendiente|en_proceso, cerrada->en_proceso (reapertura)
+                boolean ok = ("pendiente".equals(actual) && ("en_proceso".equals(nuevoEstado) || "rechazada".equals(nuevoEstado) || "pendiente".equals(nuevoEstado)))
+                        || ("en_proceso".equals(actual) && ("cerrada".equals(nuevoEstado) || "rechazada".equals(nuevoEstado) || "pendiente".equals(nuevoEstado) || "en_proceso".equals(nuevoEstado)))
                         || ("rechazada".equals(actual) && ("pendiente".equals(nuevoEstado) || "en_proceso".equals(nuevoEstado)))
                         || ("cerrada".equals(actual) && "en_proceso".equals(nuevoEstado));
                 if (!ok) { sendError(exchange, 400, "Transicion no permitida: " + actual + " -> " + nuevoEstado); return; }
+                String extraCols = (clienteId != null ? ", cliente_id = " + clienteId : "")
+                        + (rutaToken != null ? ", ruta_token = '" + rutaToken.replace("'", "''") + "'" : "")
+                        + (choferId != null ? ", chofer_id = " + choferId : "")
+                        + (cuadrilla != null ? ", cuadrilla = '" + cuadrilla.replace("'", "''") + "'" : "")
+                        + (asignadoA != null ? ", asignado_a = '" + asignadoA.replace("'", "''") + "'" : "");
                 String sql;
                 if ("cerrada".equals(nuevoEstado)) {
                     sql = "UPDATE denuncias SET estado = ?, observacion_cierre = ?, fecha_cierre = CURRENT_TIMESTAMP"
-                            + (clienteId != null ? ", cliente_id = " + clienteId : "")
-                            + (rutaToken != null ? ", ruta_token = '" + rutaToken.replace("'", "''") + "'" : "")
-                            + " WHERE id = ?";
+                            + extraCols + " WHERE id = ?";
                 } else {
                     sql = "UPDATE denuncias SET estado = ?, observacion_cierre = ?, fecha_cierre = NULL"
-                            + (clienteId != null ? ", cliente_id = " + clienteId : "")
-                            + (rutaToken != null ? ", ruta_token = '" + rutaToken.replace("'", "''") + "'" : "")
-                            + " WHERE id = ?";
+                            + extraCols + " WHERE id = ?";
                 }
                 PreparedStatement ps = conn.prepareStatement(sql);
                 ps.setString(1, nuevoEstado);
                 ps.setString(2, obs);
                 ps.setInt(3, id);
+                ps.executeUpdate();
+                sendResponse(exchange, 200, "{\"status\":\"ok\",\"estado\":\"" + nuevoEstado + "\"}");
+            }
+        }
+    }
+
+    static class DenunciasAsignarPuntoHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            setCORS(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if (!isAuthorized(exchange)) {
+                sendError(exchange, 401, "No autorizado");
+                return;
+            }
+            if (!canManageRutas(exchange)) {
+                sendError(exchange, 403, "Solo gestor o administrador puede asignar puntos de ruta");
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
+                            .lines().collect(Collectors.joining("\n"));
+                    JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+
+                    if (!json.has("denuncia_id") || json.get("denuncia_id").isJsonNull()) {
+                        sendError(exchange, 400, "denuncia_id es requerido");
+                        return;
+                    }
+                    if (!json.has("chofer_id") || json.get("chofer_id").isJsonNull()) {
+                        sendError(exchange, 400, "chofer_id es requerido");
+                        return;
+                    }
+
+                    int denunciaId = json.get("denuncia_id").getAsInt();
+                    int choferId = json.get("chofer_id").getAsInt();
+                    Integer vehiculoId = (json.has("vehiculo_id") && !json.get("vehiculo_id").isJsonNull()) ? json.get("vehiculo_id").getAsInt() : null;
+                    String nombrePunto = (json.has("nombre_punto") && !json.get("nombre_punto").isJsonNull()) ? json.get("nombre_punto").getAsString().trim() : "";
+                    String observacion = (json.has("observacion") && !json.get("observacion").isJsonNull()) ? json.get("observacion").getAsString().trim() : "";
+
+                    Integer userId = getUserIdFromSession(exchange);
+                    if (userId == null) userId = 1;
+
+                    try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                        conn.setAutoCommit(false);
+                        try {
+                            // 1. Obtener la denuncia
+                            String sqlDen = "SELECT * FROM denuncias WHERE id = ?";
+                            PreparedStatement psDen = conn.prepareStatement(sqlDen);
+                            psDen.setInt(1, denunciaId);
+                            ResultSet rsDen = psDen.executeQuery();
+                            if (!rsDen.next()) {
+                                conn.rollback();
+                                sendError(exchange, 404, "Denuncia no encontrada");
+                                return;
+                            }
+
+                            String ticket = rsDen.getString("ticket");
+                            String barrio = rsDen.getString("barrio");
+                            String categoria = rsDen.getString("categoria");
+                            String descripcion = rsDen.getString("descripcion");
+                            String fotoUrl = rsDen.getString("foto_url");
+                            double lat = rsDen.getDouble("latitud");
+                            double lon = rsDen.getDouble("longitud");
+                            Integer existingClienteId = (Integer) rsDen.getObject("cliente_id");
+
+                            if (nombrePunto.isEmpty()) {
+                                nombrePunto = "Denuncia " + ticket + " - " + barrio;
+                            }
+
+                            // 2. Obtener o crear cliente (punto de recolección)
+                            int clienteId;
+                            if (existingClienteId != null && existingClienteId > 0) {
+                                clienteId = existingClienteId;
+                                try (PreparedStatement pu = conn.prepareStatement("UPDATE clientes SET nombre = ?, tipo_cliente = 'denuncia', latitud = ?, longitud = ? WHERE id = ?")) {
+                                    pu.setString(1, nombrePunto);
+                                    pu.setDouble(2, lat);
+                                    pu.setDouble(3, lon);
+                                    pu.setInt(4, clienteId);
+                                    pu.executeUpdate();
+                                }
+                            } else {
+                                String insertCli = "INSERT INTO clientes (nombre, tipo_cliente, latitud, longitud, ciudad, cadena, activo, usuario_id) VALUES (?, 'denuncia', ?, ?, ?, ?, true, ?) RETURNING id";
+                                PreparedStatement psCli = conn.prepareStatement(insertCli);
+                                psCli.setString(1, nombrePunto);
+                                psCli.setDouble(2, lat);
+                                psCli.setDouble(3, lon);
+                                psCli.setString(4, barrio != null ? barrio : "Asunción");
+                                psCli.setString(5, barrio != null ? barrio : "Asunción");
+                                psCli.setInt(6, userId);
+                                ResultSet rsCli = psCli.executeQuery();
+                                clienteId = rsCli.next() ? rsCli.getInt(1) : 0;
+                            }
+
+                            // 3. Obtener nombres del chofer y vehiculo
+                            String choferNombre = "";
+                            try (PreparedStatement psCh = conn.prepareStatement("SELECT nombre FROM choferes WHERE id = ?")) {
+                                psCh.setInt(1, choferId);
+                                ResultSet rsCh = psCh.executeQuery();
+                                if (rsCh.next()) choferNombre = rsCh.getString("nombre");
+                            }
+
+                            String vehiculoNombre = "";
+                            if (vehiculoId != null && vehiculoId > 0) {
+                                try (PreparedStatement psVh = conn.prepareStatement("SELECT nombre FROM vehiculos WHERE id = ?")) {
+                                    psVh.setInt(1, vehiculoId);
+                                    ResultSet rsVh = psVh.executeQuery();
+                                    if (rsVh.next()) vehiculoNombre = rsVh.getString("nombre");
+                                }
+                            }
+
+                            // 4. Buscar si el chofer ya tiene una ruta activa (estado = 'en_curso')
+                            String sqlRutaActiva = "SELECT token, movil_numero, clientes_json, distancia_total, tiempo_estimado, vehiculo_id, vehiculo_nombre FROM rutas_generadas WHERE chofer_id = ? AND estado = 'en_curso' ORDER BY fecha DESC LIMIT 1";
+                            PreparedStatement psRuta = conn.prepareStatement(sqlRutaActiva);
+                            psRuta.setInt(1, choferId);
+                            ResultSet rsRuta = psRuta.executeQuery();
+
+                            String routeToken;
+                            boolean esNuevaRuta;
+                            int totalParadas;
+                            int movilNumero = 1;
+
+                            if (rsRuta.next()) {
+                                // ---- Caso A: El chofer ya tiene ruta en curso -> agregar parada extra ----
+                                esNuevaRuta = false;
+                                routeToken = rsRuta.getString("token");
+                                movilNumero = rsRuta.getInt("movil_numero");
+                                if (vehiculoId == null || vehiculoId <= 0) {
+                                    vehiculoId = (Integer) rsRuta.getObject("vehiculo_id");
+                                    vehiculoNombre = rsRuta.getString("vehiculo_nombre");
+                                }
+                                double distTotal = rsRuta.getDouble("distancia_total");
+                                int tiempoEstimado = rsRuta.getInt("tiempo_estimado");
+                                String jsonStr = rsRuta.getString("clientes_json");
+                                List<Map<String, Object>> clientesList = gson.fromJson(jsonStr, List.class);
+                                if (clientesList == null) clientesList = new ArrayList<>();
+
+                                // Calcular distancia desde la ultima parada actual hasta el nuevo punto
+                                double distExtra = 0.0;
+                                if (!clientesList.isEmpty()) {
+                                    Map<String, Object> ultimo = clientesList.get(clientesList.size() - 1);
+                                    double lastLat = ((Double) ultimo.get("latitud")).doubleValue();
+                                    double lastLon = ((Double) ultimo.get("longitud")).doubleValue();
+                                    distExtra = haversine(lastLat, lastLon, lat, lon) * 1.3;
+                                    distExtra = Math.round(distExtra * 100.0) / 100.0;
+                                    ultimo.put("distancia_siguiente", distExtra);
+                                }
+
+                                // Nuevo punto diferenciado como denuncia asignada
+                                Map<String, Object> nuevoPunto = new HashMap<>();
+                                nuevoPunto.put("id", (double) clienteId);
+                                nuevoPunto.put("nombre", nombrePunto);
+                                nuevoPunto.put("latitud", lat);
+                                nuevoPunto.put("longitud", lon);
+                                nuevoPunto.put("distancia_siguiente", 0.0);
+                                nuevoPunto.put("es_denuncia", true);
+                                nuevoPunto.put("tipo", "denuncia");
+                                nuevoPunto.put("ticket", ticket);
+                                nuevoPunto.put("categoria", categoria);
+                                nuevoPunto.put("descripcion", descripcion);
+                                nuevoPunto.put("foto_url", fotoUrl);
+                                nuevoPunto.put("estado", "pendiente");
+                                nuevoPunto.put("observacion", observacion);
+
+                                clientesList.add(nuevoPunto);
+                                totalParadas = clientesList.size();
+                                distTotal = Math.round((distTotal + distExtra) * 100.0) / 100.0;
+                                tiempoEstimado = (int) Math.ceil((distTotal / 40.0) * 60.0);
+
+                                // Actualizar rutas_generadas
+                                String updateRutaSql = "UPDATE rutas_generadas SET clientes_json = ?, distancia_total = ?, tiempo_estimado = ? WHERE token = ?";
+                                PreparedStatement psUp = conn.prepareStatement(updateRutaSql);
+                                psUp.setString(1, gson.toJson(clientesList));
+                                psUp.setDouble(2, distTotal);
+                                psUp.setInt(3, tiempoEstimado);
+                                psUp.setString(4, routeToken);
+                                psUp.executeUpdate();
+
+                                // Insertar en entregas
+                                String insEntrega = "INSERT INTO entregas (ruta_token, cliente_id, estado, observacion, orden_en_ruta) VALUES (?, ?, 'pendiente', ?, ?)";
+                                PreparedStatement psEnt = conn.prepareStatement(insEntrega);
+                                psEnt.setString(1, routeToken);
+                                psEnt.setInt(2, clienteId);
+                                psEnt.setString(3, observacion);
+                                psEnt.setInt(4, totalParadas);
+                                psEnt.executeUpdate();
+
+                            } else {
+                                // ---- Caso B: Chofer sin ruta activa -> Generar nueva ruta activa ----
+                                esNuevaRuta = true;
+                                routeToken = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+                                totalParadas = 1;
+
+                                // Si no selecciono vehiculo, tomar el primero activo
+                                if (vehiculoId == null || vehiculoId <= 0) {
+                                    try (PreparedStatement psV1 = conn.prepareStatement("SELECT id, nombre FROM vehiculos WHERE activo = true LIMIT 1")) {
+                                        ResultSet rsV1 = psV1.executeQuery();
+                                        if (rsV1.next()) {
+                                            vehiculoId = rsV1.getInt("id");
+                                            vehiculoNombre = rsV1.getString("nombre");
+                                        }
+                                    }
+                                }
+
+                                Map<String, Object> nuevoPunto = new HashMap<>();
+                                nuevoPunto.put("id", (double) clienteId);
+                                nuevoPunto.put("nombre", nombrePunto);
+                                nuevoPunto.put("latitud", lat);
+                                nuevoPunto.put("longitud", lon);
+                                nuevoPunto.put("distancia_siguiente", 0.0);
+                                nuevoPunto.put("es_denuncia", true);
+                                nuevoPunto.put("tipo", "denuncia");
+                                nuevoPunto.put("ticket", ticket);
+                                nuevoPunto.put("categoria", categoria);
+                                nuevoPunto.put("descripcion", descripcion);
+                                nuevoPunto.put("foto_url", fotoUrl);
+                                nuevoPunto.put("estado", "pendiente");
+                                nuevoPunto.put("observacion", observacion);
+
+                                List<Map<String, Object>> clientesList = new ArrayList<>();
+                                clientesList.add(nuevoPunto);
+
+                                String insertRuta = "INSERT INTO rutas_generadas (token, movil_numero, clientes_json, distancia_total, tiempo_estimado, chofer_id, vehiculo_id, chofer_nombre, vehiculo_nombre, usuario_id, estado) VALUES (?, ?, ?, 0.0, 15, ?, ?, ?, ?, ?, 'en_curso')";
+                                PreparedStatement psNewRuta = conn.prepareStatement(insertRuta);
+                                psNewRuta.setString(1, routeToken);
+                                psNewRuta.setInt(2, movilNumero);
+                                psNewRuta.setString(3, gson.toJson(clientesList));
+                                psNewRuta.setInt(4, choferId);
+                                if (vehiculoId != null) psNewRuta.setInt(5, vehiculoId); else psNewRuta.setNull(5, Types.INTEGER);
+                                psNewRuta.setString(6, choferNombre);
+                                psNewRuta.setString(7, vehiculoNombre);
+                                psNewRuta.setInt(8, userId);
+                                psNewRuta.executeUpdate();
+
+                                String insEntrega = "INSERT INTO entregas (ruta_token, cliente_id, estado, observacion, orden_en_ruta) VALUES (?, ?, 'pendiente', ?, 1)";
+                                PreparedStatement psEnt = conn.prepareStatement(insEntrega);
+                                psEnt.setString(1, routeToken);
+                                psEnt.setInt(2, clienteId);
+                                psEnt.setString(3, observacion);
+                                psEnt.executeUpdate();
+                            }
+
+                            // 5. Actualizar la denuncia para vincularla a la ruta y chofer
+                            String updDenSql = "UPDATE denuncias SET estado = 'en_proceso', cliente_id = ?, chofer_id = ?, ruta_token = ?, asignado_a = ?, observacion_cierre = COALESCE(?, observacion_cierre) WHERE id = ?";
+                            PreparedStatement psUpDen = conn.prepareStatement(updDenSql);
+                            psUpDen.setInt(1, clienteId);
+                            psUpDen.setInt(2, choferId);
+                            psUpDen.setString(3, routeToken);
+                            psUpDen.setString(4, choferNombre);
+                            psUpDen.setString(5, observacion.isEmpty() ? null : observacion);
+                            psUpDen.setInt(6, denunciaId);
+                            psUpDen.executeUpdate();
+
+                            conn.commit();
+
+                            Map<String, Object> resp = new HashMap<>();
+                            resp.put("success", true);
+                            resp.put("token", routeToken);
+                            resp.put("es_nueva_ruta", esNuevaRuta);
+                            resp.put("movil_numero", movilNumero);
+                            resp.put("chofer_id", choferId);
+                            resp.put("chofer_nombre", choferNombre);
+                            resp.put("vehiculo_id", vehiculoId);
+                            resp.put("vehiculo_nombre", vehiculoNombre);
+                            resp.put("cliente_id", clienteId);
+                            resp.put("total_paradas", totalParadas);
+                            resp.put("ticket", ticket);
+                            resp.put("message", esNuevaRuta 
+                                ? "Nueva ruta activa generada para el chofer " + choferNombre + " con la denuncia " + ticket
+                                : "Denuncia " + ticket + " agregada exitosamente como parada #" + totalParadas + " a la ruta activa del chofer " + choferNombre);
+
+                            sendResponse(exchange, 200, gson.toJson(resp));
+
+                        } catch (Exception ex) {
+                            conn.rollback();
+                            throw ex;
+                        }
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    sendError(exchange, 500, "Error asignando punto de ruta: " + e.getMessage());
+                }
+            } else {
+                exchange.sendResponseHeaders(405, -1);
+            }
+        }
+    }
+
+    static class AlertasHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            setCORS(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if (!isAuthorized(exchange)) {
+                sendError(exchange, 401, "No autorizado");
+                return;
+            }
+            String method = exchange.getRequestMethod();
+            try {
+                if ("GET".equals(method)) {
+                    handleList(exchange);
+                } else if ("POST".equals(method)) {
+                    handleCreate(exchange);
+                } else if ("PUT".equals(method)) {
+                    handleUpdate(exchange);
+                } else {
+                    exchange.sendResponseHeaders(405, -1);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                sendError(exchange, 500, "Error en alertas: " + e.getMessage());
+            }
+        }
+
+        private void handleList(HttpExchange exchange) throws IOException, SQLException {
+            boolean manager = canManageRutas(exchange);
+            boolean chofer = isChofer(exchange);
+            Integer choferId = getChoferIdFromSession(exchange);
+            String username = getUsernameFromSession(exchange);
+
+            StringBuilder sql = new StringBuilder("SELECT * FROM alertas_operativas WHERE 1=1");
+            List<Object> params = new ArrayList<>();
+
+            if (chofer && !manager) {
+                if (choferId != null) {
+                    sql.append(" AND (chofer_id = ? OR chofer_nombre = ?)");
+                    params.add(choferId);
+                    params.add(username);
+                } else {
+                    sql.append(" AND chofer_nombre = ?");
+                    params.add(username);
+                }
+            }
+
+            sql.append(" ORDER BY fecha DESC LIMIT 100");
+
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+                 PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+                for (int i = 0; i < params.size(); i++) {
+                    ps.setObject(i + 1, params.get(i));
+                }
+                ResultSet rs = ps.executeQuery();
+                List<Map<String, Object>> list = new ArrayList<>();
+                while (rs.next()) {
+                    Map<String, Object> a = new HashMap<>();
+                    a.put("id", rs.getInt("id"));
+                    a.put("tipo", rs.getString("tipo"));
+                    a.put("descripcion", rs.getString("descripcion"));
+                    a.put("chofer_id", rs.getObject("chofer_id"));
+                    a.put("chofer_nombre", rs.getString("chofer_nombre"));
+                    a.put("denuncia_id", rs.getObject("denuncia_id"));
+                    a.put("denuncia_ticket", rs.getString("denuncia_ticket"));
+                    a.put("latitud", rs.getObject("latitud"));
+                    a.put("longitud", rs.getObject("longitud"));
+                    a.put("estado", rs.getString("estado"));
+                    a.put("fecha", rs.getTimestamp("fecha") != null ? rs.getTimestamp("fecha").toString() : null);
+                    list.add(a);
+                }
+                sendResponse(exchange, 200, gson.toJson(list));
+            }
+        }
+
+        private void handleCreate(HttpExchange exchange) throws IOException, SQLException {
+            String body = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
+                    .lines().collect(Collectors.joining("\n"));
+            JsonObject json;
+            try {
+                json = JsonParser.parseString(body).getAsJsonObject();
+            } catch (Exception e) {
+                sendError(exchange, 400, "JSON inválido");
+                return;
+            }
+
+            String tipo = json.has("tipo") ? json.get("tipo").getAsString().trim() : "averia_vehiculo";
+            String descripcion = json.has("descripcion") ? json.get("descripcion").getAsString().trim() : "";
+            Integer choferId = getChoferIdFromSession(exchange);
+            String choferNombre = getUsernameFromSession(exchange);
+            if (json.has("chofer_nombre") && !json.get("chofer_nombre").getAsString().trim().isEmpty()) {
+                choferNombre = json.get("chofer_nombre").getAsString().trim();
+            }
+
+            Integer denunciaId = (json.has("denuncia_id") && !json.get("denuncia_id").isJsonNull())
+                    ? json.get("denuncia_id").getAsInt() : null;
+            String denunciaTicket = (json.has("denuncia_ticket") && !json.get("denuncia_ticket").isJsonNull())
+                    ? json.get("denuncia_ticket").getAsString().trim() : null;
+
+            Double lat = (json.has("latitud") && !json.get("latitud").isJsonNull()) ? json.get("latitud").getAsDouble() : null;
+            Double lon = (json.has("longitud") && !json.get("longitud").isJsonNull()) ? json.get("longitud").getAsDouble() : null;
+
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                String sql = "INSERT INTO alertas_operativas (tipo, descripcion, chofer_id, chofer_nombre, denuncia_id, denuncia_ticket, latitud, longitud, estado) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'activa') RETURNING id";
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ps.setString(1, tipo);
+                ps.setString(2, descripcion);
+                if (choferId != null) ps.setInt(3, choferId); else ps.setNull(3, Types.INTEGER);
+                ps.setString(4, choferNombre != null ? choferNombre : "Chofer");
+                if (denunciaId != null) ps.setInt(5, denunciaId); else ps.setNull(5, Types.INTEGER);
+                ps.setString(6, denunciaTicket);
+                if (lat != null) ps.setDouble(7, lat); else ps.setNull(7, Types.DOUBLE);
+                if (lon != null) ps.setDouble(8, lon); else ps.setNull(8, Types.DOUBLE);
+
+                ResultSet rs = ps.executeQuery();
+                int alertId = rs.next() ? rs.getInt(1) : 0;
+
+                // Si está vinculada a una denuncia, registrar observación operativa
+                if (denunciaId != null) {
+                    try (PreparedStatement upd = conn.prepareStatement(
+                            "UPDATE denuncias SET observacion_cierre = COALESCE(observacion_cierre || E'\\n', '') || ? WHERE id = ?")) {
+                        upd.setString(1, "[ALERTA CHOFER: " + tipo + " - " + descripcion + "]");
+                        upd.setInt(2, denunciaId);
+                        upd.executeUpdate();
+                    }
+                }
+
+                Map<String, Object> resp = new HashMap<>();
+                resp.put("status", "created");
+                resp.put("id", alertId);
+                resp.put("tipo", tipo);
+                resp.put("mensaje", "Alerta operativa emitida con éxito");
+                sendResponse(exchange, 201, gson.toJson(resp));
+            }
+        }
+
+        private void handleUpdate(HttpExchange exchange) throws IOException, SQLException {
+            String body = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
+                    .lines().collect(Collectors.joining("\n"));
+            JsonObject json;
+            try {
+                json = JsonParser.parseString(body).getAsJsonObject();
+            } catch (Exception e) {
+                sendError(exchange, 400, "JSON inválido");
+                return;
+            }
+            if (!json.has("id")) {
+                sendError(exchange, 400, "id es requerido");
+                return;
+            }
+            int id = json.get("id").getAsInt();
+            String nuevoEstado = json.has("estado") ? json.get("estado").getAsString().toLowerCase() : "resuelta";
+
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+                 PreparedStatement ps = conn.prepareStatement("UPDATE alertas_operativas SET estado = ? WHERE id = ?")) {
+                ps.setString(1, nuevoEstado);
+                ps.setInt(2, id);
                 ps.executeUpdate();
                 sendResponse(exchange, 200, "{\"status\":\"ok\",\"estado\":\"" + nuevoEstado + "\"}");
             }
@@ -1891,13 +2651,20 @@ String dateFilter = switch (periodo) {
                         }
                         String sessionToken = java.util.UUID.randomUUID().toString();
                         String rolSesion = normalizarRol(usuario.getRol());
-                        activeTokens.put(sessionToken, new UserSession(System.currentTimeMillis(), usuario.getUsername(), rolSesion, usuario.getId()));
+                        activeTokens.put(sessionToken, new UserSession(System.currentTimeMillis(), usuario.getUsername(), rolSesion, usuario.getId(), usuario.getChoferId()));
                         response.put("success", true);
                         response.put("message", "Login exitoso");
                         response.put("usuario", usuario.getNombre());
                         response.put("rol", rolSesion);
                         response.put("token", sessionToken);
-                        response.put("redirect", "index.html");
+                        if (usuario.getChoferId() != null) {
+                            response.put("chofer_id", usuario.getChoferId());
+                        }
+                        if ("chofer".equalsIgnoreCase(rolSesion)) {
+                            response.put("redirect", "chofer.html");
+                        } else {
+                            response.put("redirect", "index.html");
+                        }
                         sendResponse(exchange, 200, gson.toJson(response));
                     } else {
                         response.put("success", false);
@@ -2042,6 +2809,18 @@ String dateFilter = switch (periodo) {
         return null;
     }
 
+    private static String getUsernameFromSession(HttpExchange exchange) {
+        List<String> authHeaders = exchange.getRequestHeaders().get("Authorization");
+        if (authHeaders == null || authHeaders.isEmpty()) return null;
+        String authHeader = authHeaders.get(0);
+        if (authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7).trim();
+            UserSession session = activeTokens.get(token);
+            if (session != null) return session.username;
+        }
+        return null;
+    }
+
     private static String getRolFromSession(HttpExchange exchange) {
         List<String> authHeaders = exchange.getRequestHeaders().get("Authorization");
         if (authHeaders == null || authHeaders.isEmpty()) return null;
@@ -2068,41 +2847,56 @@ String dateFilter = switch (periodo) {
         return rol != null && ("gestor".equals(rol) || "admin".equals(rol) || "superadmin".equals(rol));
     }
 
-    /** Crea las categorías por defecto para un usuario si todavía no tiene ninguna definida. */
-    private static void asegurarCategoriasDefault(Connection conn, int userId) throws SQLException {
-        PreparedStatement countStmt = conn.prepareStatement("SELECT COUNT(*) FROM categorias WHERE usuario_id = ?");
-        countStmt.setInt(1, userId);
-        ResultSet rs = countStmt.executeQuery();
-        rs.next();
-        if (rs.getInt(1) > 0) {
-            countStmt.close();
-            return;
+    private static Integer getChoferIdFromSession(HttpExchange exchange) {
+        List<String> authHeaders = exchange.getRequestHeaders().get("Authorization");
+        if (authHeaders == null || authHeaders.isEmpty()) return null;
+        String authHeader = authHeaders.get(0);
+        if (authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7).trim();
+            UserSession session = activeTokens.get(token);
+            if (session != null) {
+                return session.choferId;
+            }
         }
-        countStmt.close();
+        return null;
+    }
+
+    private static boolean isChofer(HttpExchange exchange) {
+        String rol = getRolFromSession(exchange);
+        return "chofer".equalsIgnoreCase(rol);
+    }
+
+    /** Crea las categorías por defecto si todavía no existe ninguna definida en el sistema. */
+    private static void asegurarCategoriasDefault(Connection conn, int userId) throws SQLException {
+        try (Statement countStmt = conn.createStatement();
+             ResultSet rs = countStmt.executeQuery("SELECT COUNT(*) FROM categorias WHERE activo = true")) {
+            if (rs.next() && rs.getInt(1) > 0) {
+                return;
+            }
+        }
 
         List<String> nombres = new ArrayList<>(List.of("supermercado", "mayorista / distribuidor", "minorista/gastronómico"));
-        PreparedStatement usadosStmt = conn.prepareStatement("SELECT DISTINCT tipo_cliente FROM clientes WHERE activo = true AND usuario_id = ? AND tipo_cliente IS NOT NULL AND tipo_cliente <> ''");
-        usadosStmt.setInt(1, userId);
-        ResultSet rsUsados = usadosStmt.executeQuery();
-        while (rsUsados.next()) {
-            String tc = rsUsados.getString(1).trim();
-            boolean existe = false;
-            for (String n : nombres) {
-                if (n.equalsIgnoreCase(tc)) { existe = true; break; }
+        try (Statement usadosStmt = conn.createStatement();
+             ResultSet rsUsados = usadosStmt.executeQuery("SELECT DISTINCT tipo_cliente FROM clientes WHERE activo = true AND tipo_cliente IS NOT NULL AND tipo_cliente <> ''")) {
+            while (rsUsados.next()) {
+                String tc = rsUsados.getString(1).trim();
+                boolean existe = false;
+                for (String n : nombres) {
+                    if (n.equalsIgnoreCase(tc)) { existe = true; break; }
+                }
+                if (!existe) nombres.add(tc);
             }
-            if (!existe) nombres.add(tc);
         }
-        usadosStmt.close();
 
-        PreparedStatement ins = conn.prepareStatement("INSERT INTO categorias (nombre, activo, usuario_id) VALUES (?, true, ?)");
-        for (String n : nombres) {
-            ins.setString(1, n);
-            ins.setInt(2, userId);
-            try {
-                ins.executeUpdate();
-            } catch (SQLException ignored) { }
+        try (PreparedStatement ins = conn.prepareStatement("INSERT INTO categorias (nombre, activo, usuario_id) VALUES (?, true, ?)")) {
+            for (String n : nombres) {
+                ins.setString(1, n);
+                ins.setInt(2, userId);
+                try {
+                    ins.executeUpdate();
+                } catch (SQLException ignored) { }
+            }
         }
-        ins.close();
     }
 
     private static void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
@@ -2580,16 +3374,41 @@ String dateFilter = switch (periodo) {
             if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
             if ("GET".equals(exchange.getRequestMethod())) {
                 try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                    String sql = "SELECT * FROM choferes WHERE activo = true AND usuario_id = ? ORDER BY nombre";
+                    boolean manager = canManageRutas(exchange);
+                    String sql = manager
+                            ? "SELECT * FROM choferes WHERE activo = true ORDER BY nombre"
+                            : "SELECT * FROM choferes WHERE activo = true AND usuario_id = ? ORDER BY nombre";
                     PreparedStatement stmt = conn.prepareStatement(sql);
-                    stmt.setInt(1, userId);
+                    if (!manager) {
+                        stmt.setInt(1, userId);
+                    }
                     ResultSet rs = stmt.executeQuery();
                     List<Map<String, Object>> choferes = new ArrayList<>();
                     while (rs.next()) {
                         Map<String, Object> c = new HashMap<>();
-                        c.put("id", rs.getInt("id"));
+                        int cId = rs.getInt("id");
+                        c.put("id", cId);
                         c.put("nombre", rs.getString("nombre"));
                         c.put("telefono", rs.getString("telefono"));
+
+                        // Verificar si tiene ruta activa en_curso
+                        try (PreparedStatement pR = conn.prepareStatement("SELECT token, movil_numero, vehiculo_nombre, clientes_json FROM rutas_generadas WHERE chofer_id = ? AND estado = 'en_curso' LIMIT 1")) {
+                            pR.setInt(1, cId);
+                            ResultSet rsR = pR.executeQuery();
+                            if (rsR.next()) {
+                                c.put("ruta_activa_token", rsR.getString("token"));
+                                c.put("ruta_activa_movil", rsR.getInt("movil_numero"));
+                                c.put("ruta_activa_vehiculo", rsR.getString("vehiculo_nombre"));
+                                String jsonCli = rsR.getString("clientes_json");
+                                int paradasCount = 0;
+                                if (jsonCli != null) {
+                                    List<?> l = gson.fromJson(jsonCli, List.class);
+                                    if (l != null) paradasCount = l.size();
+                                }
+                                c.put("ruta_activa_paradas", paradasCount);
+                            }
+                        } catch (Exception ignored) {}
+
                         choferes.add(c);
                     }
                     sendResponse(exchange, 200, gson.toJson(choferes));
@@ -2620,11 +3439,16 @@ String dateFilter = switch (periodo) {
                 try {
                     String query = exchange.getRequestURI().getQuery();
                     int id = Integer.parseInt(query.split("id=")[1].split("&")[0]);
+                    boolean manager = canManageRutas(exchange);
                     try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                        String sql = "UPDATE choferes SET activo = false WHERE id = ? AND usuario_id = ?";
+                        String sql = manager
+                                ? "UPDATE choferes SET activo = false WHERE id = ?"
+                                : "UPDATE choferes SET activo = false WHERE id = ? AND usuario_id = ?";
                         PreparedStatement pstmt = conn.prepareStatement(sql);
                         pstmt.setInt(1, id);
-                        pstmt.setInt(2, userId);
+                        if (!manager) {
+                            pstmt.setInt(2, userId);
+                        }
                         pstmt.executeUpdate();
                         sendResponse(exchange, 200, "{\"status\":\"deleted\"}");
                     }
@@ -2638,13 +3462,18 @@ String dateFilter = switch (periodo) {
                     int id = ((Double) req.get("id")).intValue();
                     String nombre = (String) req.get("nombre");
                     String telefono = (String) req.get("telefono");
+                    boolean manager = canManageRutas(exchange);
                     try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                        String sql = "UPDATE choferes SET nombre = ?, telefono = ? WHERE id = ? AND usuario_id = ?";
+                        String sql = manager
+                                ? "UPDATE choferes SET nombre = ?, telefono = ? WHERE id = ?"
+                                : "UPDATE choferes SET nombre = ?, telefono = ? WHERE id = ? AND usuario_id = ?";
                         PreparedStatement pstmt = conn.prepareStatement(sql);
                         pstmt.setString(1, nombre);
                         pstmt.setString(2, telefono);
                         pstmt.setInt(3, id);
-                        pstmt.setInt(4, userId);
+                        if (!manager) {
+                            pstmt.setInt(4, userId);
+                        }
                         pstmt.executeUpdate();
                         sendResponse(exchange, 200, "{\"status\":\"updated\"}");
                     }
@@ -2671,11 +3500,16 @@ String dateFilter = switch (periodo) {
             }
             Integer userId = getUserIdFromSession(exchange);
             if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
+            boolean manager = canManageRutas(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
                 try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                    String sql = "SELECT * FROM vehiculos WHERE activo = true AND usuario_id = ? ORDER BY nombre";
+                    String sql = manager
+                            ? "SELECT * FROM vehiculos WHERE activo = true ORDER BY nombre"
+                            : "SELECT * FROM vehiculos WHERE activo = true AND usuario_id = ? ORDER BY nombre";
                     PreparedStatement stmt = conn.prepareStatement(sql);
-                    stmt.setInt(1, userId);
+                    if (!manager) {
+                        stmt.setInt(1, userId);
+                    }
                     ResultSet rs = stmt.executeQuery();
                     List<Map<String, Object>> vehiculos = new ArrayList<>();
                     while (rs.next()) {
@@ -2717,10 +3551,14 @@ String dateFilter = switch (periodo) {
                     String query = exchange.getRequestURI().getQuery();
                     int id = Integer.parseInt(query.split("id=")[1].split("&")[0]);
                     try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                        String sql = "UPDATE vehiculos SET activo = false WHERE id = ? AND usuario_id = ?";
+                        String sql = manager
+                                ? "UPDATE vehiculos SET activo = false WHERE id = ?"
+                                : "UPDATE vehiculos SET activo = false WHERE id = ? AND usuario_id = ?";
                         PreparedStatement pstmt = conn.prepareStatement(sql);
                         pstmt.setInt(1, id);
-                        pstmt.setInt(2, userId);
+                        if (!manager) {
+                            pstmt.setInt(2, userId);
+                        }
                         pstmt.executeUpdate();
                         sendResponse(exchange, 200, "{\"status\":\"deleted\"}");
                     }
@@ -2736,13 +3574,17 @@ String dateFilter = switch (periodo) {
                     String chapa = (String) req.get("chapa");
                     String tipo = (String) req.get("tipo");
                     try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                        String sql = "UPDATE vehiculos SET nombre = ?, chapa = ?, tipo = ? WHERE id = ? AND usuario_id = ?";
+                        String sql = manager
+                                ? "UPDATE vehiculos SET nombre = ?, chapa = ?, tipo = ? WHERE id = ?"
+                                : "UPDATE vehiculos SET nombre = ?, chapa = ?, tipo = ? WHERE id = ? AND usuario_id = ?";
                         PreparedStatement pstmt = conn.prepareStatement(sql);
                         pstmt.setString(1, nombre);
                         pstmt.setString(2, chapa);
                         pstmt.setString(3, tipo);
                         pstmt.setInt(4, id);
-                        pstmt.setInt(5, userId);
+                        if (!manager) {
+                            pstmt.setInt(5, userId);
+                        }
                         pstmt.executeUpdate();
                         sendResponse(exchange, 200, "{\"status\":\"updated\"}");
                     }
@@ -2992,11 +3834,16 @@ String dateFilter = switch (periodo) {
             }
             Integer userId = getUserIdFromSession(exchange);
             if (userId == null) { sendError(exchange, 401, "No autorizado"); return; }
+            boolean manager = canManageRutas(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
                 try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                    String sql = "SELECT nombre, latitud, longitud FROM clientes WHERE activo = true AND usuario_id = ?";
+                    String sql = manager
+                            ? "SELECT nombre, latitud, longitud FROM clientes WHERE activo = true"
+                            : "SELECT nombre, latitud, longitud FROM clientes WHERE activo = true AND usuario_id = ?";
                     PreparedStatement stmt = conn.prepareStatement(sql);
-                    stmt.setInt(1, userId);
+                    if (!manager) {
+                        stmt.setInt(1, userId);
+                    }
                     ResultSet rs = stmt.executeQuery();
 
                     StringBuilder kml = new StringBuilder();

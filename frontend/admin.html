@@ -16,6 +16,7 @@
 
     <!-- Design System CSS -->
     <link rel="stylesheet" href="css/style.css">
+    <script src="js/glass-dialogs.js"></script>
 
     <style>
         /* =========================================================
@@ -462,6 +463,12 @@
             border: 1px solid rgba(139, 92, 246, 0.25);
         }
 
+        .badge-chofer {
+            background: rgba(14, 165, 233, 0.12);
+            color: #38bdf8;
+            border: 1px solid rgba(14, 165, 233, 0.25);
+        }
+
         .badge-status {
             padding: 6px 12px;
             border-radius: 20px;
@@ -586,10 +593,32 @@
             padding: 32px;
             width: 90%;
             max-width: 480px;
+            max-height: 90vh;
+            overflow-y: auto;
+            overflow-x: hidden;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
             position: relative;
-            overflow: hidden;
             animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+        }
+
+        .modal-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal-container::-webkit-scrollbar-track {
+            background: transparent;
+            margin: 18px 0;
+        }
+
+        .modal-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+
+        .modal-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
         }
 
         .modal-container::before {
@@ -616,21 +645,62 @@
         .control-input {
             width: 100%;
             padding: 14px 16px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #0f121b;
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 12px;
-            color: #fff;
+            color: #f8fafc;
             font-family: inherit;
             font-size: 14px;
             transition: all 0.3s;
             box-sizing: border-box;
+            color-scheme: dark;
         }
 
         .control-input:focus {
             outline: none;
             border-color: var(--primary-accent);
-            background: rgba(255, 255, 255, 0.06);
+            background: #141a27;
             box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        /* Estilo explícito para dropdowns (select y option) en formularios de creación y edición */
+        select.control-input,
+        .modal-container select {
+            background-color: #0f121b !important;
+            color: #f8fafc !important;
+            color-scheme: dark;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.293a1 1 0 0 0 1.506 0L13 5.732a1 1 0 1 0-1.506-1.464L8 9.568 3.754 5.268a1 1 0 1 0-1.506 1.464l5.247 5.561z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            padding-right: 42px;
+        }
+
+        /* Opciones del menú desplegable: fondo oscuro uniforme y texto blanco brillante visible SIEMPRE */
+        select.control-input option,
+        .modal-container select option,
+        select.select-filter option {
+            background-color: #161c28 !important;
+            color: #f8fafc !important;
+            padding: 12px 16px;
+            font-size: 14px;
+        }
+
+        select.control-input option:checked,
+        select.control-input option[selected],
+        .modal-container select option:checked,
+        .modal-container select option[selected] {
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+            font-weight: 600;
+        }
+
+        select.control-input option:hover,
+        .modal-container select option:hover {
+            background-color: #1d4ed8 !important;
+            color: #ffffff !important;
         }
 
         .btn-secondary-outline {
@@ -700,6 +770,9 @@
             </div>
 
             <div class="header-actions">
+                <a href="index.html" class="btn-glass" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-route"></i> Gestor</a>
+                <a href="chofer.html" class="btn-glass" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-truck"></i> Chofer</a>
+                <a href="ciudadano.html" class="btn-glass" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-bullhorn"></i> Ciudadano</a>
                 <button class="btn-glass" onclick="logout()" style="color:var(--danger); border-color:var(--danger);"><i class="fas fa-sign-out-alt"></i> Salir</button>
             </div>
         </div>
@@ -751,6 +824,7 @@
                     <option value="todos">Todos los roles</option>
                     <option value="superadmin">Super Admin</option>
                     <option value="gestor">Gestor rutas+denuncias</option>
+                    <option value="chofer">Chofer</option>
                     <option value="ciudadano">Ciudadano</option>
                 </select>
 
@@ -812,6 +886,7 @@
                     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px; color:var(--text-muted); text-transform:uppercase;">Rol del Sistema</label>
                     <select id="nuevoRol" class="control-input" style="width:100%; box-sizing:border-box;">
                         <option value="ciudadano">Ciudadano (denuncias)</option>
+                        <option value="chofer">Chofer (rutas asignadas)</option>
                         <option value="gestor">Gestor rutas + denuncias</option>
                         <option value="superadmin">Super Admin</option>
                     </select>
@@ -849,6 +924,7 @@
                     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px; color:var(--text-muted); text-transform:uppercase;">Rol del Sistema</label>
                     <select id="editRol" class="control-input" style="width:100%; box-sizing:border-box;">
                         <option value="ciudadano">Ciudadano (denuncias)</option>
+                        <option value="chofer">Chofer (rutas asignadas)</option>
                         <option value="gestor">Gestor rutas + denuncias</option>
                         <option value="superadmin">Super Admin</option>
                     </select>
@@ -974,6 +1050,7 @@
             const badgeFor = (rol) => {
                 if (rol === 'superadmin') return `<span class="badge-role badge-superadmin"><i class="fas fa-crown"></i> Super Admin</span>`;
                 if (rol === 'ciudadano') return `<span class="badge-role badge-ciudadano"><i class="fas fa-user"></i> Ciudadano</span>`;
+                if (rol === 'chofer') return `<span class="badge-role badge-chofer"><i class="fas fa-truck"></i> Chofer</span>`;
                 return `<span class="badge-role badge-gestor"><i class="fas fa-route"></i> Gestor</span>`;
             };
             tbody.innerHTML = lista.map(u => {

@@ -1,0 +1,2983 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoRuta · Panel del Chofer | Rutas y Denuncias Asignadas</title>
+
+    <!-- Auth Guard -->
+    <script>
+        const token = localStorage.getItem('ecoruta_token') || localStorage.getItem('nexo_token');
+        const rol = (localStorage.getItem('ecoruta_rol') || localStorage.getItem('nexo_rol') || '').toLowerCase();
+        if (!token) {
+            window.location.href = 'login1.html';
+        } else if (rol === 'superadmin') {
+            // Superadmin can test chofer view if desired, but default to admin
+        }
+    </script>
+
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Leaflet CSS with CDN fallback -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="js/glass-dialogs.js"></script>
+
+    <style>
+        :root {
+            --bg-base: #06110c;
+            --bg-surface: rgba(14, 28, 22, 0.78);
+            --bg-surface-elevated: rgba(20, 39, 31, 0.88);
+            --bg-surface-hover: rgba(28, 54, 43, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-border-subtle: rgba(255, 255, 255, 0.06);
+            --glass-blur: blur(24px) saturate(170%);
+            --shadow-glass: 0 16px 40px rgba(0, 0, 0, 0.45);
+            --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.25);
+
+            --primary: #10b981;
+            --primary-hover: #059669;
+            --primary-light: rgba(16, 185, 129, 0.15);
+            --accent-mint: #7dffc4;
+            --accent-amber: #f59e0b;
+            --accent-amber-light: rgba(245, 158, 11, 0.18);
+            --accent-red: #ef4444;
+            --accent-red-light: rgba(239, 68, 68, 0.18);
+            --accent-blue: #3b82f6;
+            --accent-blue-light: rgba(59, 130, 246, 0.18);
+
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-subtle: #64748b;
+
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+            --radius-full: 9999px;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Ambient Glowing Background Orbs */
+        .bg-orbs {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.28;
+            animation: orbFloat 22s ease-in-out infinite alternate;
+        }
+
+        .orb-1 {
+            width: 650px;
+            height: 650px;
+            background: radial-gradient(circle, #059669 0%, transparent 70%);
+            top: -150px;
+            left: -150px;
+        }
+
+        .orb-2 {
+            width: 550px;
+            height: 550px;
+            background: radial-gradient(circle, #047857 0%, transparent 70%);
+            bottom: -150px;
+            right: -100px;
+            animation-duration: 28s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, #d97706 0%, transparent 70%);
+            top: 40%;
+            right: 25%;
+            opacity: 0.15;
+            animation-duration: 34s;
+        }
+
+        @keyframes orbFloat {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, -30px) scale(1.08); }
+            100% { transform: translate(-30px, 40px) scale(0.95); }
+        }
+
+        /* Top Bar Header */
+        header.chofer-header {
+            position: relative;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: var(--bg-surface);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border-bottom: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text-main);
+        }
+
+        .brand-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, #10b981, #047857);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 1.25rem;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+        }
+
+        .brand-title {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand-title h1 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #ffffff;
+        }
+
+        .brand-title span {
+            font-size: 0.75rem;
+            color: var(--accent-mint);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .driver-info-pill {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 14px;
+            border-radius: var(--radius-full);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--glass-border);
+            font-size: 0.85rem;
+        }
+
+        .driver-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #059669, #10b981);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 0.8rem;
+        }
+
+        .pulse-online {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-mint);
+            box-shadow: 0 0 10px var(--accent-mint);
+            margin-right: 4px;
+        }
+
+        /* Action Buttons in Header */
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* The Prominent Alert Button */
+        .btn-emitir-alerta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            border-radius: var(--radius-full);
+            border: 1px solid rgba(245, 158, 11, 0.5);
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(220, 38, 38, 0.25) 100%);
+            color: #fef08a;
+            font-size: 0.875rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            backdrop-filter: var(--glass-blur);
+            box-shadow: 0 4px 18px rgba(245, 158, 11, 0.35);
+            transition: var(--transition);
+        }
+
+        .btn-emitir-alerta:hover {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.45) 0%, rgba(220, 38, 38, 0.45) 100%);
+            border-color: rgba(245, 158, 11, 0.8);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(245, 158, 11, 0.55);
+            color: #ffffff;
+        }
+
+        .btn-emitir-alerta i {
+            font-size: 1rem;
+            color: #fbbf24;
+            animation: alertPulse 2s infinite ease-in-out;
+        }
+
+        @keyframes alertPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.18); opacity: 0.85; }
+        }
+
+        .btn-icon-glass {
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-icon-glass:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--text-main);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .btn-logout {
+            color: #fca5a5;
+        }
+        .btn-logout:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fecaca;
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        /* Main Workspace Container */
+        .workspace {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: stretch;
+            flex: 1 1 auto;
+            min-height: 0;
+            height: calc(100vh - 67px);
+            overflow: hidden;
+        }
+
+        /* Left Sidebar: Complaints and Operations */
+        .sidebar-panel {
+            width: 440px;
+            max-width: 100%;
+            height: 100%;
+            background: var(--bg-surface);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: var(--transition);
+            z-index: 15;
+        }
+
+        /* Tabs */
+        .panel-tabs {
+            display: flex;
+            padding: 12px 16px 0;
+            gap: 8px;
+            border-bottom: 1px solid var(--glass-border-subtle);
+        }
+
+        .tab-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-mint);
+            border-bottom-color: var(--primary);
+            background: rgba(16, 185, 129, 0.08);
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+        }
+
+        .tab-btn i {
+            font-size: 0.95rem;
+        }
+
+        .tab-counter {
+            font-size: 0.72rem;
+            padding: 2px 7px;
+            border-radius: var(--radius-full);
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+        }
+
+        .tab-btn.active .tab-counter {
+            background: var(--primary);
+            color: #06110c;
+        }
+
+        /* Search and Filter Strip */
+        .filter-strip {
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-bottom: 1px solid var(--glass-border-subtle);
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-subtle);
+            font-size: 0.85rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px 8px 36px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            color: var(--text-main);
+            font-size: 0.85rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.09);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        .state-filter-chips {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 2px;
+        }
+
+        .chip-btn {
+            padding: 4px 10px;
+            border-radius: var(--radius-full);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border-subtle);
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: var(--transition);
+        }
+
+        .chip-btn.active, .chip-btn:hover {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: var(--primary);
+            color: var(--accent-mint);
+        }
+
+        /* Cards List Area */
+        .cards-scrollable {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(16, 185, 129, 0.4) transparent;
+        }
+
+        .cards-scrollable::-webkit-scrollbar {
+            width: 6px;
+        }
+        .cards-scrollable::-webkit-scrollbar-track {
+            background: transparent;
+            margin: 8px 0;
+        }
+        .cards-scrollable::-webkit-scrollbar-thumb {
+            background: rgba(16, 185, 129, 0.3);
+            border-radius: var(--radius-full);
+        }
+        .cards-scrollable::-webkit-scrollbar-thumb:hover {
+            background: rgba(16, 185, 129, 0.65);
+        }
+
+        /* Complaint Card Item - Dinámico y Responsivo */
+        .complaint-card {
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+            position: relative;
+            flex-shrink: 0; /* CRÍTICO: Evita que el flexbox aplaste y corte las tarjetas */
+            min-height: fit-content; /* Tamaño dinámico y responsivo que se adapta al contenido */
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .complaint-card:hover {
+            border-color: rgba(16, 185, 129, 0.45);
+            background: var(--bg-surface-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .complaint-card.selected {
+            border-color: var(--primary);
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35), 0 8px 24px rgba(0, 0, 0, 0.45);
+            background: rgba(20, 44, 34, 0.95);
+        }
+
+        .card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .ticket-code {
+            font-family: monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--accent-mint);
+            background: rgba(16, 185, 129, 0.12);
+            padding: 3px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge-status {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: var(--radius-full);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-pendiente {
+            background: var(--accent-amber-light);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .badge-en_proceso {
+            background: var(--accent-blue-light);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .badge-cerrada {
+            background: var(--primary-light);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .card-category {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-category i {
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+
+        .card-location {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            line-height: 1.35;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .card-location i {
+            color: #f87171;
+            margin-top: 2px;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .card-desc {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.4;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 8px 10px;
+            border-radius: var(--radius-sm);
+            border-left: 3px solid var(--primary);
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .card-citizen {
+            font-size: 0.75rem;
+            color: var(--text-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 4px;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        /* Card Action Bar */
+        .card-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+            padding-top: 8px;
+            border-top: 1px solid var(--glass-border-subtle);
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: var(--transition);
+        }
+
+        .btn-map-focus {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--glass-border);
+            color: var(--text-main);
+        }
+        .btn-map-focus:hover {
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-status-proceso {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
+        }
+        .btn-status-proceso:hover {
+            background: rgba(59, 130, 246, 0.35);
+            color: #ffffff;
+        }
+
+        .btn-status-cerrar {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #6ee7b7;
+        }
+        .btn-status-cerrar:hover {
+            background: rgba(16, 185, 129, 0.38);
+            color: #ffffff;
+        }
+
+        .btn-card-alert {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border-radius: var(--radius-sm);
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            color: #fcd34d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-card-alert:hover {
+            background: rgba(245, 158, 11, 0.35);
+            color: #fff;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .empty-state i {
+            font-size: 2.5rem;
+            color: var(--text-subtle);
+            opacity: 0.6;
+        }
+        .empty-state p {
+            font-size: 0.88rem;
+            line-height: 1.4;
+        }
+
+        /* Map Container Area */
+        .map-wrapper {
+            flex: 1 1 auto;
+            align-self: stretch;
+            position: relative;
+            min-width: 0;
+            min-height: 400px;
+            overflow: hidden;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            background: #08140f;
+            z-index: 1;
+        }
+
+        /* Floating Controls on Map */
+        .map-floating-overlay {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .glass-control-panel {
+            background: var(--bg-surface);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 6px;
+            box-shadow: var(--shadow-glass);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .btn-map-control {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--glass-border-subtle);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .btn-map-control:hover {
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: var(--accent-mint);
+        }
+
+        .map-legend-pill {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: var(--bg-surface);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-full);
+            padding: 8px 18px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: var(--shadow-glass);
+            font-size: 0.75rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .legend-truck { background: #10b981; }
+        .legend-pending { background: #f59e0b; }
+        .legend-process { background: #3b82f6; }
+        .legend-closed { background: #059669; }
+
+        /* Custom Leaflet Markers */
+        .custom-truck-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981, #047857);
+            color: #ffffff;
+            font-size: 1.2rem;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.8), 0 4px 12px rgba(0, 0, 0, 0.5);
+            border: 2px solid #ffffff;
+            animation: truckRadar 2.5s infinite;
+        }
+
+        @keyframes truckRadar {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 16px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .custom-complaint-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            color: #ffffff;
+            font-size: 0.95rem;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.85);
+            transition: var(--transition);
+        }
+
+        .marker-pending {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+        .marker-process {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        }
+        .marker-closed {
+            background: linear-gradient(135deg, #10b981, #059669);
+            opacity: 0.8;
+        }
+
+        /* Mi Ruta: Styles for Route Summary & Stops */
+        .route-summary-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(59, 130, 246, 0.1));
+            border: 1px solid rgba(16, 185, 129, 0.28);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        }
+
+        .route-metrics-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .metric-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--glass-border-subtle);
+        }
+
+        .metric-pill i {
+            color: var(--accent-mint);
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #3b82f6);
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+
+        .btn-finalizar-jornada {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: var(--transition);
+            width: 100%;
+        }
+
+        .btn-finalizar-jornada:hover {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+        }
+
+        .parada-card {
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: var(--transition);
+        }
+
+        .parada-card:hover {
+            border-color: rgba(255, 255, 255, 0.22);
+            background: var(--bg-surface-hover);
+        }
+
+        .parada-card.is-denuncia {
+            border-left: 4px solid #f59e0b;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(20, 39, 31, 0.88));
+        }
+
+        .parada-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .parada-numero-badge {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #5B6BFF;
+            color: white;
+            font-weight: 800;
+            font-size: 0.92rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+
+        .parada-numero-badge.denuncia {
+            background: #F59E0B;
+            border: 2px solid #FEF08A;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.7);
+        }
+
+        .parada-numero-badge.entregado {
+            background: #10B981;
+        }
+
+        .parada-numero-badge.rechazado {
+            background: #EF4444;
+        }
+
+        .badge-denuncia-tag {
+            background: rgba(245, 158, 11, 0.18);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 4px;
+        }
+
+        .estado-btn-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .btn-estado-parada {
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            text-align: center;
+        }
+
+        .btn-estado-parada.activo-pendiente {
+            background: rgba(245, 158, 11, 0.22);
+            border-color: #f59e0b;
+            color: #fbbf24;
+        }
+
+        .btn-estado-parada.activo-entregado {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: #10b981;
+            color: #34d399;
+        }
+
+        .btn-estado-parada.activo-rechazado {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: #ef4444;
+            color: #f87171;
+        }
+
+        .obs-parada-input {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border-subtle);
+            color: var(--text-main);
+            font-size: 0.8rem;
+            resize: vertical;
+            outline: none;
+            min-height: 48px;
+        }
+
+        .obs-parada-input:focus {
+            border-color: var(--primary);
+            background: rgba(0, 0, 0, 0.45);
+        }
+
+        .btn-guardar-parada {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: var(--transition);
+        }
+
+        .btn-guardar-parada:hover {
+            background: var(--primary);
+            color: #06110c;
+            border-color: var(--primary);
+        }
+
+        @keyframes pulseDot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.3); }
+        }
+
+        /* Glassmorphic Modals */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(3, 10, 7, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-backdrop.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .glass-modal {
+            background: rgba(15, 30, 24, 0.9);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 520px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: modalPop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes modalPop {
+            from { transform: scale(0.92) translateY(20px); opacity: 0; }
+            to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--glass-border-subtle);
+        }
+
+        .modal-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal-icon-badge {
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+        }
+
+        .icon-alert-modal {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .icon-close-modal {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .modal-title h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .modal-title p {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .modal-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-subtle);
+            font-size: 1.25rem;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .modal-close-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .modal-body {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            max-height: calc(85vh - 140px);
+            overflow-y: auto;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .form-select, .form-textarea, .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            color: var(--text-main);
+            font-size: 0.88rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .form-select {
+            color-scheme: dark;
+            background-color: #0d1e16 !important;
+            color: #f8fafc !important;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.293a1 1 0 0 0 1.506 0L13 5.732a1 1 0 1 0-1.506-1.464L8 9.568 3.754 5.268a1 1 0 1 0-1.506 1.464l5.247 5.561z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 38px;
+        }
+
+        .form-select option {
+            background-color: #0f241a !important;
+            color: #ffffff !important;
+            padding: 10px 14px;
+        }
+
+        .form-select option:checked,
+        .form-select option[selected] {
+            background-color: #059669 !important;
+            color: #ffffff !important;
+            font-weight: 600;
+        }
+
+        .form-select:focus, .form-textarea:focus, .form-input:focus {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.09);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 95px;
+            line-height: 1.45;
+        }
+
+        /* Alert Type Radio Grid */
+        .alert-type-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .alert-type-card {
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.03);
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .alert-type-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .alert-type-card.active {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.15);
+        }
+
+        .alert-type-card i {
+            font-size: 1.15rem;
+            color: #fbbf24;
+        }
+
+        .alert-type-card span {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .gps-status-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            font-size: 0.78rem;
+            color: #6ee7b7;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--glass-border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-modal-cancel {
+            padding: 9px 18px;
+            border-radius: var(--radius-full);
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-modal-cancel:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+
+        .btn-modal-submit-alert {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 20px;
+            border-radius: var(--radius-full);
+            border: none;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
+            transition: var(--transition);
+        }
+        .btn-modal-submit-alert:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 22px rgba(239, 68, 68, 0.5);
+        }
+
+        .btn-modal-submit-close {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 20px;
+            border-radius: var(--radius-full);
+            border: none;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+            transition: var(--transition);
+        }
+        .btn-modal-submit-close:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 22px rgba(16, 185, 129, 0.5);
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast-glass {
+            padding: 12px 18px;
+            border-radius: var(--radius-md);
+            background: rgba(15, 30, 24, 0.95);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            color: #ffffff;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 280px;
+            animation: toastIn 0.3s ease;
+        }
+
+        .toast-glass.success { border-left: 4px solid var(--primary); }
+        .toast-glass.warning { border-left: 4px solid var(--accent-amber); }
+        .toast-glass.danger { border-left: 4px solid var(--accent-red); }
+
+        @keyframes toastIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .workspace {
+                flex-direction: column-reverse;
+            }
+            .sidebar-panel {
+                width: 100%;
+                height: 50vh;
+            }
+            .map-wrapper {
+                height: 50vh;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Ambient Glowing Background Orbs -->
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="chofer-header">
+        <div class="header-left">
+            <a href="#" class="brand-badge">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-truck"></i>
+                </div>
+                <div class="brand-title">
+                    <h1>EcoRuta Chofer</h1>
+                    <span>Módulo Operativo de Cuadrilla</span>
+                </div>
+            </a>
+
+            <div class="driver-info-pill">
+                <div class="driver-avatar">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+                <div>
+                    <span class="pulse-online"></span>
+                    <strong id="driverNameDisplay">Chofer</strong>
+                    <span id="vehicleDisplay" style="color: var(--text-muted); font-size: 0.78rem; margin-left: 6px;">(Móvil Asignado)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <!-- PROMINENT ALERT BUTTON AS REQUESTED -->
+            <button type="button" class="btn-emitir-alerta" id="btnEmitirAlerta" onclick="abrirModalAlerta()">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Emitir Alerta Operativa</span>
+            </button>
+
+            <!-- Center GPS button -->
+            <button type="button" class="btn-icon-glass" title="Centrar mi posición en el mapa" onclick="centrarEnChofer()">
+                <i class="fa-solid fa-crosshairs"></i>
+            </button>
+
+            <!-- Reload data -->
+            <button type="button" class="btn-icon-glass" title="Actualizar denuncias" onclick="cargarDenunciasChofer()">
+                <i class="fa-solid fa-rotate"></i>
+            </button>
+
+            <!-- Logout -->
+            <button type="button" class="btn-icon-glass btn-logout" title="Cerrar sesión" onclick="cerrarSesion()">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="workspace">
+        
+        <!-- Left Sidebar: Complaints and Alerts list -->
+        <aside class="sidebar-panel">
+            
+            <div class="panel-tabs">
+                <button type="button" class="tab-btn active" id="tabRuta" onclick="cambiarTab('ruta')">
+                    <i class="fa-solid fa-route"></i>
+                    <span>Mi Ruta</span>
+                    <span class="tab-counter" id="countParadas">0</span>
+                </button>
+                <button type="button" class="tab-btn" id="tabDenuncias" onclick="cambiarTab('denuncias')">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <span>Denuncias</span>
+                    <span class="tab-counter" id="countDenuncias">0</span>
+                </button>
+                <button type="button" class="tab-btn" id="tabAlertas" onclick="cambiarTab('alertas')">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>Mis Alertas</span>
+                    <span class="tab-counter" id="countAlertas">0</span>
+                </button>
+            </div>
+
+            <!-- View: Mi Ruta (Map Points and Stops) -->
+            <div id="viewRuta" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                <!-- Summary strip -->
+                <div id="rutaSummaryContainer" style="padding: 12px 16px; border-bottom: 1px solid var(--glass-border-subtle);">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Scrollable Stops List -->
+                <div class="cards-scrollable" id="listaParadasContainer">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <p>Cargando hoja de ruta activa...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Denuncias List -->
+            <div id="viewDenuncias" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                <div class="filter-strip">
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="filtroTexto" class="search-input" placeholder="Buscar por ticket, barrio o calle..." oninput="filtrarDenuncias()">
+                    </div>
+                    <div class="state-filter-chips">
+                        <button type="button" class="chip-btn active" onclick="filtrarPorEstado('todas', this)">Todas</button>
+                        <button type="button" class="chip-btn" onclick="filtrarPorEstado('pendiente', this)">Pendientes</button>
+                        <button type="button" class="chip-btn" onclick="filtrarPorEstado('en_proceso', this)">En Proceso</button>
+                        <button type="button" class="chip-btn" onclick="filtrarPorEstado('cerrada', this)">Atendidas</button>
+                    </div>
+                </div>
+
+                <div class="cards-scrollable" id="listaDenunciasContainer">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <p>Cargando denuncias asignadas...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Alerts List -->
+            <div id="viewAlertas" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                <div class="filter-strip">
+                    <p style="font-size: 0.8rem; color: var(--text-muted);">
+                        Alertas operativas emitidas por este chofer para notificación de incidentes mecánicos o accesos bloqueados.
+                    </p>
+                </div>
+                <div class="cards-scrollable" id="listaAlertasContainer">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <p>No has emitido alertas de averías ni problemas operativos.</p>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Right: Interactive Leaflet Map -->
+        <main class="map-wrapper" style="position: relative;">
+            <div id="map"></div>
+
+            <!-- Active Route Banner Overlay -->
+            <div id="mapRouteBadge" style="position: absolute; top: 16px; left: 60px; z-index: 1000; background: rgba(14, 28, 22, 0.88); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 999px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; color: #f8fafc; display: none; align-items: center; gap: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
+                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: pulseDot 2s infinite;"></span>
+                <span id="mapRouteTitle">Ruta en Curso</span>
+            </div>
+
+            <!-- Floating Controls -->
+            <div class="map-floating-overlay">
+                <div class="glass-control-panel">
+                    <button type="button" class="btn-map-control" title="Centrar en mi camión" onclick="centrarEnChofer()">
+                        <i class="fa-solid fa-location-arrow"></i>
+                    </button>
+                    <button type="button" class="btn-map-control" title="Ver toda la ruta" onclick="ajustarVistaMapa()">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                    <button type="button" class="btn-map-control" title="Alternar simulación GPS" onclick="toggleSimularGPS()">
+                        <i class="fa-solid fa-satellite-dish"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Map Legend -->
+            <div class="map-legend-pill">
+                <div class="legend-item">
+                    <div class="legend-dot legend-truck"></div>
+                    <span>Mi Camión (GPS)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #5B6BFF;"></div>
+                    <span>Parada Normal</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #F59E0B; box-shadow: 0 0 6px rgba(245, 158, 11, 0.8);"></div>
+                    <span>Denuncia Asignada</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #10B981;"></div>
+                    <span>Completada</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #EF4444;"></div>
+                    <span>Rechazada</span>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- MODAL 1: EMITIR ALERTA OPERATIVA (GLASSMORPHISM) -->
+    <div class="modal-backdrop" id="modalAlertaBackdrop">
+        <div class="glass-modal">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon-badge icon-alert-modal">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="modal-title">
+                        <h3>Emitir Alerta Operativa</h3>
+                        <p>Reporte de averías o imposibilidad de atención en ruta</p>
+                    </div>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="cerrarModalAlerta()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="formAlertaOperativa" onsubmit="enviarAlertaOperativa(event)">
+                <div class="modal-body">
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fa-solid fa-triangle-exclamation" style="color: #fbbf24;"></i>
+                            Tipo de Incidente / Alerta
+                        </label>
+                        <div class="alert-type-grid">
+                            <div class="alert-type-card active" onclick="seleccionarTipoAlerta('averia_vehiculo', this)">
+                                <i class="fa-solid fa-truck-pickup"></i>
+                                <span>Avería mecánica del camión</span>
+                            </div>
+                            <div class="alert-type-card" onclick="seleccionarTipoAlerta('calle_bloqueada', this)">
+                                <i class="fa-solid fa-road-barrier"></i>
+                                <span>Acceso bloqueado / intransitable</span>
+                            </div>
+                            <div class="alert-type-card" onclick="seleccionarTipoAlerta('capacidad_colmada', this)">
+                                <i class="fa-solid fa-dumpster"></i>
+                                <span>Capacidad colmada de tolva</span>
+                            </div>
+                            <div class="alert-type-card" onclick="seleccionarTipoAlerta('imposibilitado', this)">
+                                <i class="fa-solid fa-user-slash"></i>
+                                <span>Imposibilitado de atender</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="alertaTipo" value="averia_vehiculo">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="alertaDenunciaSelect">
+                            <i class="fa-solid fa-tag" style="color: var(--primary);"></i>
+                            Denuncia Asociada (Opcional)
+                        </label>
+                        <select id="alertaDenunciaSelect" class="form-select">
+                            <option value="">Incidente General de Ruta (Sin vincular)</option>
+                            <!-- Se puebla dinámicamente -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="alertaDescripcion">
+                            <i class="fa-solid fa-message" style="color: var(--accent-mint);"></i>
+                            Detalle del Problema
+                        </label>
+                        <textarea id="alertaDescripcion" class="form-textarea" required
+                            placeholder="Describa el motivo: neumático pinchado, motor sobrecalentado, cables caídos impiden el paso, etc..."></textarea>
+                    </div>
+
+                    <div class="gps-status-box" id="gpsAlertaInfo">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <span>Coordenadas GPS adjuntas: <strong id="coordsText">-25.2980, -57.6250</strong></span>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" onclick="cerrarModalAlerta()">Cancelar</button>
+                    <button type="submit" class="btn-modal-submit-alert">
+                        <i class="fa-solid fa-bullhorn"></i>
+                        <span>Transmitir Alerta</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: FINALIZAR ATENCIÓN DE DENUNCIA -->
+    <div class="modal-backdrop" id="modalFinalizarBackdrop">
+        <div class="glass-modal">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon-badge icon-close-modal">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div class="modal-title">
+                        <h3>Finalizar Recolección</h3>
+                        <p id="modalFinalizarSub">Completar atención de denuncia asignada</p>
+                    </div>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="cerrarModalFinalizar()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="formFinalizarDenuncia" onsubmit="confirmarCierreDenuncia(event)">
+                <input type="hidden" id="finalizarDenunciaId" value="">
+                <div class="modal-body">
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fa-solid fa-clipboard-check" style="color: var(--primary);"></i>
+                            Observaciones de Limpieza / Cierre
+                        </label>
+                        <textarea id="finalizarObservacion" class="form-textarea" required
+                            placeholder="Ejemplo: Residuos recolectados exitosamente, área despejada con pala cargadora y cuadrilla."></textarea>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" onclick="cerrarModalFinalizar()">Cancelar</button>
+                    <button type="submit" class="btn-modal-submit-close">
+                        <i class="fa-solid fa-check-double"></i>
+                        <span>Marcar como Completada</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Leaflet JS with unpkg fallback -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        if (typeof L === 'undefined') {
+            document.write('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>');
+        }
+    </script>
+
+    <script>
+        // Global State
+        let map = null;
+        let choferMarker = null;
+        let complaintMarkers = [];
+        let routeStopMarkers = [];
+        let routePolyline = null;
+        let denunciasData = [];
+        let alertasData = [];
+        let rutaActualData = null;
+        let activeTabActual = 'ruta';
+        let filtroEstadoActual = 'todas';
+        let denunciaSeleccionadaId = null;
+
+        // Chofer GPS Location (Asunción default)
+        let choferLocation = {
+            lat: -25.2980,
+            lng: -57.6250
+        };
+
+        const usuarioActual = localStorage.getItem('ecoruta_user') || 'Chofer';
+        const choferIdStored = localStorage.getItem('ecoruta_chofer_id');
+
+        // Initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            const nameEl = document.getElementById('driverNameDisplay');
+            if (nameEl) nameEl.textContent = usuarioActual;
+            
+            initMap();
+            obtenerGeolocalizacionChofer();
+            cargarRutaChofer();
+            cargarDenunciasChofer();
+            cargarAlertasChofer();
+
+            // Handle window resizing
+            window.addEventListener('resize', () => {
+                if (map) map.invalidateSize();
+            });
+
+            // Refresh periodically every 30 seconds
+            setInterval(() => {
+                cargarRutaChofer(true);
+                cargarDenunciasChofer(true);
+            }, 30000);
+        });
+
+        // Map Initialization
+        function initMap() {
+            if (typeof L === 'undefined') {
+                console.error("Leaflet library not loaded yet.");
+                setTimeout(initMap, 500);
+                return;
+            }
+
+            try {
+                map = L.map('map', {
+                    center: [choferLocation.lat, choferLocation.lng],
+                    zoom: 14,
+                    zoomControl: false
+                });
+
+                // Primary base tile layer: OpenStreetMap (high reliability, zero API key)
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    subdomains: ['a', 'b', 'c'],
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    maxZoom: 19,
+                    crossOrigin: true
+                }).addTo(map);
+
+                L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+                // Create Driver Live Truck Marker
+                actualizarMarcadorChofer();
+
+                // Leaflet needs invalidateSize once flex layout has rendered
+                setTimeout(() => { if (map) map.invalidateSize(); }, 150);
+                setTimeout(() => { if (map) map.invalidateSize(); }, 400);
+                setTimeout(() => { if (map) map.invalidateSize(); }, 1000);
+            } catch (e) {
+                console.error("Error al inicializar mapa:", e);
+            }
+        }
+
+        function actualizarMarcadorChofer() {
+            if (!map) return;
+            const truckIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class="custom-truck-marker" title="Mi Camión: ${usuarioActual}">
+                         <i class="fa-solid fa-truck"></i>
+                       </div>`,
+                iconSize: [44, 44],
+                iconAnchor: [22, 22]
+            });
+
+            if (choferMarker) {
+                choferMarker.setLatLng([choferLocation.lat, choferLocation.lng]);
+            } else {
+                choferMarker = L.marker([choferLocation.lat, choferLocation.lng], { icon: truckIcon })
+                    .addTo(map)
+                    .bindPopup(`<strong>${usuarioActual}</strong><br><span style="font-size: 0.8rem; color: #10b981;">En servicio activo</span>`);
+            }
+
+            document.getElementById('coordsText').textContent = `${choferLocation.lat.toFixed(4)}, ${choferLocation.lng.toFixed(4)}`;
+        }
+
+        function centrarEnChofer() {
+            if (map && choferMarker) {
+                map.setView([choferLocation.lat, choferLocation.lng], 16, { animate: true });
+                choferMarker.openPopup();
+            }
+        }
+
+        function obtenerGeolocalizacionChofer() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        choferLocation.lat = pos.coords.latitude;
+                        choferLocation.lng = pos.coords.longitude;
+                        actualizarMarcadorChofer();
+                    },
+                    (err) => {
+                        console.warn("No se pudo obtener GPS real, usando coordenadas base de Asunción:", err.message);
+                    },
+                    { enableHighAccuracy: true, timeout: 6000 }
+                );
+            }
+        }
+
+        function toggleSimularGPS() {
+            // Small offset to simulate driver movement
+            choferLocation.lat += (Math.random() - 0.5) * 0.004;
+            choferLocation.lng += (Math.random() - 0.5) * 0.004;
+            actualizarMarcadorChofer();
+            centrarEnChofer();
+            mostrarToast("Posición de camión actualizada en ruta", "success");
+        }
+
+        // Fetch Complaints Assigned to Driver
+        async function cargarDenunciasChofer(silent = false) {
+            try {
+                const response = await fetch('/api/denuncias', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.status === 401) {
+                    window.location.href = 'login1.html';
+                    return;
+                }
+
+                denunciasData = await response.json();
+                document.getElementById('countDenuncias').textContent = denunciasData.length;
+
+                renderizarListaDenuncias();
+                renderizarMarcadoresMapa();
+                actualizarSelectDenunciasAlerta();
+
+                if (!silent && denunciasData.length > 0) {
+                    ajustarVistaMapa();
+                }
+            } catch (err) {
+                console.error("Error cargando denuncias:", err);
+                if (!silent) {
+                    mostrarToast("Error al conectar con el servidor", "danger");
+                }
+            }
+        }
+
+        function renderizarListaDenuncias() {
+            const container = document.getElementById('listaDenunciasContainer');
+            const textoFiltro = document.getElementById('filtroTexto').value.toLowerCase().trim();
+
+            const filtradas = denunciasData.filter(d => {
+                const coincideEstado = (filtroEstadoActual === 'todas') || (d.estado === filtroEstadoActual);
+                const coincideTexto = !textoFiltro || 
+                    (d.ticket && d.ticket.toLowerCase().includes(textoFiltro)) ||
+                    (d.barrio && d.barrio.toLowerCase().includes(textoFiltro)) ||
+                    (d.descripcion && d.descripcion.toLowerCase().includes(textoFiltro)) ||
+                    (d.direccion_referencia && d.direccion_referencia.toLowerCase().includes(textoFiltro));
+                return coincideEstado && coincideTexto;
+            });
+
+            if (filtradas.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fa-solid fa-clipboard-check"></i>
+                        <p>No hay denuncias asignadas con los filtros seleccionados.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtradas.map(d => {
+                const estadoClass = `badge-${d.estado || 'pendiente'}`;
+                const estadoLabel = d.estado === 'en_proceso' ? 'En Proceso' : (d.estado === 'cerrada' ? 'Atendida' : 'Pendiente');
+                const isSelected = d.id === denunciaSeleccionadaId ? 'selected' : '';
+
+                return `
+                    <div class="complaint-card ${isSelected}" id="card-denuncia-${d.id}" onclick="seleccionarDenuncia(${d.id})">
+                        <div class="card-top">
+                            <span class="ticket-code">
+                                <i class="fa-solid fa-ticket"></i>
+                                ${d.ticket || 'S/N'}
+                            </span>
+                            <span class="badge-status ${estadoClass}">${estadoLabel}</span>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="card-category">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>${formatearCategoria(d.categoria)}</span>
+                            </div>
+                            <div class="card-location">
+                                <i class="fa-solid fa-location-dot"></i>
+                                <span>${d.barrio || 'Asunción'} · ${d.direccion_referencia || 'Sin dirección específica'}</span>
+                            </div>
+                            <div class="card-desc">
+                                "${escaparHTML(d.descripcion || 'Sin descripción')}"
+                            </div>
+                            ${d.foto_url ? `
+                                <div style="margin: 6px 0; border-radius: 8px; overflow: hidden; border: 1px solid rgba(16, 185, 129, 0.35); background: #000; max-height: 120px;">
+                                    <img src="${escaparHTML(d.foto_url)}" alt="Evidencia fotografica" style="width: 100%; height: auto; max-height: 120px; object-fit: contain; display: block;">
+                                </div>
+                            ` : ''}
+                            <div class="card-citizen">
+                                <span><i class="fa-solid fa-user" style="margin-right: 4px;"></i>${d.nombre_ciudadano || 'Ciudadano anónimo'}</span>
+                                ${d.telefono ? `<span><i class="fa-solid fa-phone" style="margin-right: 4px;"></i>${d.telefono}</span>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="card-actions" onclick="event.stopPropagation()">
+                            <button type="button" class="btn-action btn-map-focus" onclick="focalizarEnMapa(${d.id})">
+                                <i class="fa-solid fa-location-crosshairs"></i>
+                                <span>Ver</span>
+                            </button>
+
+                            ${d.estado !== 'en_proceso' && d.estado !== 'cerrada' ? `
+                                <button type="button" class="btn-action btn-status-proceso" onclick="iniciarAtencionDenuncia(${d.id})">
+                                    <i class="fa-solid fa-play"></i>
+                                    <span>Iniciar</span>
+                                </button>
+                            ` : ''}
+
+                            ${d.estado !== 'cerrada' ? `
+                                <button type="button" class="btn-action btn-status-cerrar" onclick="abrirModalFinalizar(${d.id}, '${d.ticket}')">
+                                    <i class="fa-solid fa-check"></i>
+                                    <span>Finalizar</span>
+                                </button>
+                            ` : `
+                                <span style="font-size: 0.75rem; color: #34d399; font-weight: 600; padding: 6px;">
+                                    <i class="fa-solid fa-circle-check"></i> Completada
+                                </span>
+                            `}
+
+                            <button type="button" class="btn-card-alert" title="Reportar avería / imposibilidad con esta denuncia" onclick="abrirModalAlerta(${d.id}, '${d.ticket}')">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderizarMarcadoresMapa() {
+            if (!map) return;
+
+            // Clear old complaint markers
+            complaintMarkers.forEach(m => map.removeLayer(m));
+            complaintMarkers = [];
+
+            denunciasData.forEach(d => {
+                if (!d.latitud || !d.longitud) return;
+
+                const markerClass = d.estado === 'en_proceso' ? 'marker-process' : (d.estado === 'cerrada' ? 'marker-closed' : 'marker-pending');
+                const iconHtml = `
+                    <div class="custom-complaint-marker ${markerClass}">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </div>
+                `;
+
+                const markerIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: iconHtml,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                });
+
+                const m = L.marker([d.latitud, d.longitud], { icon: markerIcon }).addTo(map);
+
+                const popupContent = `
+                    <div style="font-family: 'Inter', sans-serif; min-width: 200px; color: #0f172a;">
+                        <strong style="color: #047857;">${d.ticket}</strong>
+                        <p style="margin: 4px 0; font-size: 0.85rem;"><strong>Barrio:</strong> ${d.barrio}</p>
+                        <p style="margin: 4px 0; font-size: 0.8rem; color: #475569;">${d.direccion_referencia || ''}</p>
+                        ${d.foto_url ? `
+                            <div style="margin: 6px 0; border-radius: 6px; overflow: hidden; max-height: 100px; background: #000;">
+                                <img src="${escaparHTML(d.foto_url)}" alt="Evidencia" style="width: 100%; height: auto; max-height: 100px; object-fit: cover; display: block;">
+                            </div>
+                        ` : ''}
+                        <div style="margin-top: 8px; display: flex; gap: 6px;">
+                            <button onclick="trazarRutaHacia(${d.latitud}, ${d.longitud})" style="flex:1; padding: 5px 8px; background: #10b981; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.75rem;">
+                                Trazar Ruta
+                            </button>
+                            <button onclick="abrirModalAlerta(${d.id}, '${d.ticket}')" style="padding: 5px 8px; background: #f59e0b; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.75rem;" title="Alerta">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                m.bindPopup(popupContent);
+                m.denunciaId = d.id;
+                complaintMarkers.push(m);
+            });
+        }
+
+        function ajustarVistaMapa() {
+            if (!map) return;
+            try {
+                map.invalidateSize();
+                const group = [];
+                if (choferMarker && choferMarker.getLatLng) group.push(choferMarker.getLatLng());
+
+                if (activeTabActual === 'ruta' && routeStopMarkers.length > 0) {
+                    routeStopMarkers.forEach(m => {
+                        if (m && m.getLatLng) group.push(m.getLatLng());
+                    });
+                } else if (complaintMarkers.length > 0) {
+                    complaintMarkers.forEach(m => {
+                        if (m && m.getLatLng) group.push(m.getLatLng());
+                    });
+                }
+
+                if (group.length > 0) {
+                    const bounds = L.latLngBounds(group);
+                    if (bounds.isValid()) {
+                        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+                    }
+                }
+            } catch (e) {
+                console.warn("Aviso al ajustar vista de mapa:", e);
+            }
+        }
+
+        function seleccionarDenuncia(id) {
+            denunciaSeleccionadaId = id;
+            document.querySelectorAll('.complaint-card').forEach(c => c.classList.remove('selected'));
+            const card = document.getElementById(`card-denuncia-${id}`);
+            if (card) card.classList.add('selected');
+
+            focalizarEnMapa(id);
+        }
+
+        function focalizarEnMapa(id) {
+            const d = denunciasData.find(x => x.id === id);
+            if (!d || !d.latitud || !d.longitud) return;
+
+            map.setView([d.latitud, d.longitud], 17, { animate: true });
+
+            const m = complaintMarkers.find(marker => marker.denunciaId === id);
+            if (m) m.openPopup();
+
+            trazarRutaHacia(d.latitud, d.longitud);
+        }
+
+        function trazarRutaHacia(destLat, destLng) {
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+            }
+
+            // Simple direct connecting route dashed line with pulse
+            const latlngs = [
+                [choferLocation.lat, choferLocation.lng],
+                [destLat, destLng]
+            ];
+
+            routePolyline = L.polyline(latlngs, {
+                color: '#10b981',
+                weight: 4,
+                dashArray: '8, 8',
+                opacity: 0.85
+            }).addTo(map);
+
+            mostrarToast("Ruta visual hacia punto trazada", "success");
+        }
+
+        // Complaint State Transitions
+        async function iniciarAtencionDenuncia(id) {
+            try {
+                const res = await fetch('/api/denuncias', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        id: id,
+                        estado: 'en_proceso'
+                    })
+                });
+
+                if (res.ok) {
+                    mostrarToast("Denuncia puesta EN PROCESO de atención", "success");
+                    cargarDenunciasChofer(true);
+                } else {
+                    const err = await res.json();
+                    mostrarToast(err.message || "Error al actualizar estado", "warning");
+                }
+            } catch (e) {
+                console.error(e);
+                mostrarToast("Error de conexión al iniciar atención", "danger");
+            }
+        }
+
+        function abrirModalFinalizar(id, ticket) {
+            document.getElementById('finalizarDenunciaId').value = id;
+            document.getElementById('modalFinalizarSub').textContent = `Ticket: ${ticket}`;
+            document.getElementById('finalizarObservacion').value = '';
+            document.getElementById('modalFinalizarBackdrop').classList.add('active');
+        }
+
+        function cerrarModalFinalizar() {
+            document.getElementById('modalFinalizarBackdrop').classList.remove('active');
+        }
+
+        async function confirmarCierreDenuncia(e) {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('finalizarDenunciaId').value);
+            const obs = document.getElementById('finalizarObservacion').value.trim();
+
+            try {
+                const res = await fetch('/api/denuncias', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        id: id,
+                        estado: 'cerrada',
+                        observacion_cierre: obs
+                    })
+                });
+
+                if (res.ok) {
+                    cerrarModalFinalizar();
+                    mostrarToast("Denuncia FINALIZADA y registrada como completada", "success");
+                    if (routePolyline) {
+                        map.removeLayer(routePolyline);
+                        routePolyline = null;
+                    }
+                    cargarDenunciasChofer(true);
+                } else {
+                    const err = await res.json();
+                    mostrarToast(err.message || "No se pudo cerrar la denuncia", "warning");
+                }
+            } catch (err) {
+                console.error(err);
+                mostrarToast("Error al enviar cierre", "danger");
+            }
+        }
+
+        // Operational Alerts
+        function abrirModalAlerta(denunciaId = null, denunciaTicket = null) {
+            actualizarSelectDenunciasAlerta();
+            if (denunciaId) {
+                document.getElementById('alertaDenunciaSelect').value = denunciaId;
+            } else {
+                document.getElementById('alertaDenunciaSelect').value = '';
+            }
+
+            document.getElementById('alertaDescripcion').value = '';
+            document.getElementById('coordsText').textContent = `${choferLocation.lat.toFixed(4)}, ${choferLocation.lng.toFixed(4)}`;
+            document.getElementById('modalAlertaBackdrop').classList.add('active');
+        }
+
+        function cerrarModalAlerta() {
+            document.getElementById('modalAlertaBackdrop').classList.remove('active');
+        }
+
+        function seleccionarTipoAlerta(tipo, cardElement) {
+            document.getElementById('alertaTipo').value = tipo;
+            document.querySelectorAll('.alert-type-card').forEach(c => c.classList.remove('active'));
+            cardElement.classList.add('active');
+        }
+
+        function actualizarSelectDenunciasAlerta() {
+            const select = document.getElementById('alertaDenunciaSelect');
+            if (!select) return;
+
+            const opciones = denunciasData.map(d => `
+                <option value="${d.id}">Denuncia ${d.ticket} - ${d.barrio}</option>
+            `).join('');
+
+            select.innerHTML = `<option value="">Incidente General de Ruta (Sin vincular)</option>` + opciones;
+        }
+
+        async function enviarAlertaOperativa(e) {
+            e.preventDefault();
+            const tipo = document.getElementById('alertaTipo').value;
+            const descripcion = document.getElementById('alertaDescripcion').value.trim();
+            const denunciaIdVal = document.getElementById('alertaDenunciaSelect').value;
+            const denunciaId = denunciaIdVal ? parseInt(denunciaIdVal) : null;
+
+            let denunciaTicket = null;
+            if (denunciaId) {
+                const found = denunciasData.find(d => d.id === denunciaId);
+                if (found) denunciaTicket = found.ticket;
+            }
+
+            const payload = {
+                tipo: tipo,
+                descripcion: descripcion,
+                denuncia_id: denunciaId,
+                denuncia_ticket: denunciaTicket,
+                latitud: choferLocation.lat,
+                longitud: choferLocation.lng,
+                chofer_nombre: usuarioActual
+            };
+
+            try {
+                const res = await fetch('/api/alertas', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    cerrarModalAlerta();
+                    mostrarToast("ALERTA OPERATIVA EMITIDA Y NOTIFICADA", "warning");
+                    cargarAlertasChofer();
+                    cargarDenunciasChofer(true);
+                } else {
+                    const err = await res.json();
+                    mostrarToast(err.message || "Error emitiendo alerta", "danger");
+                }
+            } catch (err) {
+                console.error(err);
+                mostrarToast("Fallo al conectar con la central de operaciones", "danger");
+            }
+        }
+
+        async function cargarAlertasChofer() {
+            try {
+                const res = await fetch('/api/alertas', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    alertasData = await res.json();
+                    document.getElementById('countAlertas').textContent = alertasData.length;
+                    renderizarListaAlertas();
+                }
+            } catch (e) {
+                console.error("Error al cargar alertas:", e);
+            }
+        }
+
+        function renderizarListaAlertas() {
+            const container = document.getElementById('listaAlertasContainer');
+            if (alertasData.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <p>No tienes alertas registradas en este turno.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = alertasData.map(a => {
+                const fecha = a.fecha ? a.fecha.replace('T', ' ').substring(0, 16) : 'Reciente';
+                const isActiva = a.estado === 'activa';
+                return `
+                    <div class="complaint-card" style="border-left: 3px solid ${isActiva ? '#f59e0b' : '#10b981'};">
+                        <div class="card-top">
+                            <span class="ticket-code" style="color: #fbbf24; background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.3);">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                ${formatearTipoAlerta(a.tipo)}
+                            </span>
+                            <span class="badge-status ${isActiva ? 'badge-pendiente' : 'badge-cerrada'}">
+                                ${isActiva ? 'Activa' : 'Resuelta'}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div class="card-desc" style="border-left-color: #f59e0b;">
+                                "${escaparHTML(a.descripcion || 'Sin detalle')}"
+                            </div>
+                            <div class="card-citizen">
+                                <span>${a.denuncia_ticket ? `Vinculada a: <strong>${a.denuncia_ticket}</strong>` : 'Incidente general'}</span>
+                                <span>${fecha}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==========================================
+        // MI RUTA: HOJA DE RUTA Y MAPA EN CURSO
+        // ==========================================
+        async function cargarRutaChofer(silent = false) {
+            try {
+                const response = await fetch('/api/ruta', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.status === 401) {
+                    window.location.href = 'login1.html';
+                    return;
+                }
+
+                if (response.ok) {
+                    rutaActualData = await response.json();
+                    if (!rutaActualData.puntos && rutaActualData.clientes) {
+                        rutaActualData.puntos = rutaActualData.clientes;
+                    }
+                    if (rutaActualData.distancia_total != null && rutaActualData.total_km == null) {
+                        rutaActualData.total_km = rutaActualData.distancia_total;
+                    }
+                    if (rutaActualData.tiempo_estimado != null && rutaActualData.tiempo_estimado_min == null) {
+                        rutaActualData.tiempo_estimado_min = rutaActualData.tiempo_estimado;
+                    }
+                    (rutaActualData.puntos || []).forEach(p => {
+                        if (p.lat == null && p.latitud != null) p.lat = p.latitud;
+                        if (p.lng == null && p.longitud != null) p.lng = p.longitud;
+                    });
+
+                    const puntos = rutaActualData.puntos || [];
+                    const countEl = document.getElementById('countParadas');
+                    if (countEl) countEl.textContent = puntos.length;
+
+                    // Header vehicle info
+                    const vehiculoNombre = rutaActualData.vehiculo_nombre || rutaActualData.matricula;
+                    if (vehiculoNombre || rutaActualData.vehiculo_id) {
+                        const vEl = document.getElementById('vehicleDisplay');
+                        if (vEl) vEl.textContent = `· Móvil ${rutaActualData.movil || rutaActualData.vehiculo_id || ''} (${vehiculoNombre || 'Asignado'})`;
+                    }
+
+                    // Map Route Banner
+                    const badge = document.getElementById('mapRouteBadge');
+                    const title = document.getElementById('mapRouteTitle');
+                    if (badge && title) {
+                        badge.style.display = 'inline-flex';
+                        title.textContent = `Ruta: ${rutaActualData.token || 'En Curso'} · ${puntos.length} paradas`;
+                    }
+
+                    renderizarResumenRuta();
+                    renderizarListaParadas();
+                    renderizarRutaEnMapa();
+
+                    if (!silent && puntos.length > 0) {
+                        ajustarVistaMapa();
+                    }
+                } else {
+                    rutaActualData = null;
+                    const countEl = document.getElementById('countParadas');
+                    if (countEl) countEl.textContent = '0';
+                    const badge = document.getElementById('mapRouteBadge');
+                    if (badge) badge.style.display = 'none';
+
+                    renderizarRutaVacia();
+                    if (routePolyline) {
+                        map.removeLayer(routePolyline);
+                        routePolyline = null;
+                    }
+                    routeStopMarkers.forEach(m => map.removeLayer(m));
+                    routeStopMarkers = [];
+                }
+            } catch (err) {
+                console.error("Error al cargar ruta del chofer:", err);
+                if (!silent) {
+                    mostrarToast("Error consultando ruta activa", "danger");
+                }
+            }
+        }
+
+        function renderizarRutaVacia() {
+            const summary = document.getElementById('rutaSummaryContainer');
+            if (summary) summary.innerHTML = '';
+
+            const container = document.getElementById('listaParadasContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fa-solid fa-route" style="color: var(--text-muted); font-size: 2rem; margin-bottom: 8px;"></i>
+                        <p style="font-weight: 600; color: var(--text-main);">Sin Hoja de Ruta Activa</p>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                            El centro de operaciones aún no te ha asignado una ruta o todas las paradas fueron completadas.
+                        </p>
+                        <button type="button" class="btn-guardar-parada" style="margin-top: 12px;" onclick="cargarRutaChofer()">
+                            <i class="fa-solid fa-rotate"></i> Reintentar
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function renderizarResumenRuta() {
+            const container = document.getElementById('rutaSummaryContainer');
+            if (!container || !rutaActualData) return;
+
+            const puntos = rutaActualData.puntos || [];
+            const completados = puntos.filter(p => (p.estado || '').toLowerCase() === 'entregado').length;
+            const rechazados = puntos.filter(p => (p.estado || '').toLowerCase() === 'rechazado').length;
+            const pendientes = puntos.length - completados - rechazados;
+            const pct = puntos.length > 0 ? Math.round(((completados + rechazados) / puntos.length) * 100) : 0;
+            const denunciasCount = puntos.filter(p => p.es_denuncia || p.tipo === 'denuncia' || (p.nombre && p.nombre.toLowerCase().startsWith('denuncia'))).length;
+
+            const finalizada = rutaActualData.finalizada || rutaActualData.estado === 'finalizada';
+
+            container.innerHTML = `
+                <div class="route-summary-card">
+                    <div class="route-metrics-row">
+                        <div>
+                            <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-mint); font-weight: 700;">
+                                <i class="fa-solid fa-truck-fast"></i> Hoja de Ruta Activa
+                            </span>
+                            <h3 style="font-size: 0.95rem; font-weight: 800; color: #fff; margin-top: 2px;">
+                                ${rutaActualData.token || 'Ruta Chofer'}
+                            </h3>
+                        </div>
+                        <span class="badge-status ${finalizada ? 'badge-cerrada' : 'badge-proceso'}">
+                            ${finalizada ? 'Finalizada' : 'En Curso'}
+                        </span>
+                    </div>
+
+                    <div class="route-metrics-row">
+                        <div class="metric-pill">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <span><strong>${puntos.length}</strong> paradas</span>
+                        </div>
+                        <div class="metric-pill">
+                            <i class="fa-solid fa-road"></i>
+                            <span>${(rutaActualData.total_km || 0).toFixed(1)} km</span>
+                        </div>
+                        <div class="metric-pill">
+                            <i class="fa-solid fa-clock"></i>
+                            <span>~${Math.round(rutaActualData.tiempo_estimado_min || 0)} min</span>
+                        </div>
+                        ${denunciasCount > 0 ? `
+                            <div class="metric-pill" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.35); color: #fbbf24;">
+                                <i class="fa-solid fa-triangle-exclamation" style="color: #fbbf24;"></i>
+                                <span>${denunciasCount} denuncia${denunciasCount > 1 ? 's' : ''}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px;">
+                            <span>Progreso de Jornada</span>
+                            <span><strong>${completados + rechazados}</strong> de ${puntos.length} (${pct}%)</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: ${pct}%;"></div>
+                        </div>
+                    </div>
+
+                    ${!finalizada ? `
+                        <button type="button" class="btn-finalizar-jornada" onclick="finalizarRutaChofer()">
+                            <i class="fa-solid fa-flag-checkered"></i>
+                            <span>Finalizar Jornada de Ruta</span>
+                        </button>
+                    ` : `
+                        <div style="text-align: center; font-size: 0.78rem; color: #34d399; font-weight: 700; padding: 4px;">
+                            <i class="fa-solid fa-circle-check"></i> Jornada Completada y Cerrada
+                        </div>
+                    `}
+                </div>
+            `;
+        }
+
+        function renderizarListaParadas() {
+            const container = document.getElementById('listaParadasContainer');
+            if (!container || !rutaActualData) return;
+
+            const puntos = rutaActualData.puntos || [];
+            if (puntos.length === 0) {
+                renderizarRutaVacia();
+                return;
+            }
+
+            const finalizada = rutaActualData.finalizada || rutaActualData.estado === 'finalizada';
+
+            container.innerHTML = puntos.map((p, idx) => {
+                const est = (p.estado || 'pendiente').toLowerCase();
+                const isDenuncia = p.es_denuncia || p.tipo === 'denuncia' || (p.nombre && p.nombre.toLowerCase().startsWith('denuncia'));
+                const numeroClass = isDenuncia ? 'denuncia' : (est === 'entregado' ? 'entregado' : (est === 'rechazado' ? 'rechazado' : ''));
+
+                return `
+                    <div class="parada-card ${isDenuncia ? 'is-denuncia' : ''}" id="card-parada-${p.id}">
+                        <div class="parada-header">
+                            <div class="parada-numero-badge ${numeroClass}">
+                                ${isDenuncia ? `<i class="fa-solid fa-triangle-exclamation" style="font-size: 11px; margin-right: 2px;"></i>` : ''}${idx + 1}
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                ${isDenuncia ? `
+                                    <div class="badge-denuncia-tag">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                        <span>DENUNCIA ASIGNADA ${p.ticket ? `· ${escaparHTML(p.ticket)}` : ''}</span>
+                                    </div>
+                                ` : ''}
+                                <h4 style="font-size: 0.9rem; font-weight: 700; color: #f8fafc; margin-bottom: 2px; word-break: break-word;">
+                                    ${escaparHTML(p.nombre)}
+                                </h4>
+                                ${p.distancia_siguiente ? `
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                                        <i class="fa-solid fa-arrow-right-long" style="color: var(--accent-mint);"></i>
+                                        <span>${p.distancia_siguiente} km a la siguiente parada</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <button type="button" class="btn-icon-glass" style="width: 32px; height: 32px;" title="Ver parada en el mapa" onclick="focalizarParadaEnMapa(${p.id})">
+                                <i class="fa-solid fa-location-crosshairs"></i>
+                            </button>
+                        </div>
+
+                        ${isDenuncia && p.descripcion ? `
+                            <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(0, 0, 0, 0.28); padding: 8px 10px; border-radius: 6px; border-left: 3px solid #f59e0b; line-height: 1.4;">
+                                "${escaparHTML(p.descripcion)}"
+                            </div>
+                        ` : ''}
+
+                        ${isDenuncia && p.foto_url ? `
+                            <div style="margin: 4px 0; border-radius: 8px; overflow: hidden; border: 1px solid rgba(245, 158, 11, 0.35); background: #000; max-height: 110px;">
+                                <img src="${escaparHTML(p.foto_url)}" alt="Evidencia fotográfica" style="width: 100%; height: auto; max-height: 110px; object-fit: cover; display: block;">
+                            </div>
+                        ` : ''}
+
+                        <!-- Action Status Buttons -->
+                        <div class="estado-btn-group" ${finalizada ? 'style="pointer-events: none; opacity: 0.6;"' : ''}>
+                            <button type="button" class="btn-estado-parada ${est === 'pendiente' ? 'activo-pendiente' : ''}" onclick="setEstadoParada(${p.id}, 'pendiente')">
+                                <i class="fa-solid fa-clock" style="margin-right: 3px;"></i> Pendiente
+                            </button>
+                            <button type="button" class="btn-estado-parada ${est === 'entregado' ? 'activo-entregado' : ''}" onclick="setEstadoParada(${p.id}, 'entregado')">
+                                <i class="fa-solid fa-check" style="margin-right: 3px;"></i> Entregado
+                            </button>
+                            <button type="button" class="btn-estado-parada ${est === 'rechazado' ? 'activo-rechazado' : ''}" onclick="setEstadoParada(${p.id}, 'rechazado')">
+                                <i class="fa-solid fa-xmark" style="margin-right: 3px;"></i> Rechazado
+                            </button>
+                        </div>
+
+                        <!-- Observation textarea -->
+                        <textarea id="obs-parada-${p.id}" class="obs-parada-input" placeholder="Motivo de rechazo o nota de recolección (obligatorio si no es entregado)" ${finalizada ? 'disabled' : ''}>${escaparHTML(p.observacion || '')}</textarea>
+
+                        ${!finalizada ? `
+                            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                ${isDenuncia ? `
+                                    <button type="button" class="btn-card-alert" title="Emitir alerta operativa sobre este punto" onclick="abrirModalAlerta(${p.id}, '${p.ticket || ''}')" style="width: 32px; height: 32px; padding: 0;">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                    </button>
+                                ` : ''}
+                                <button type="button" class="btn-guardar-parada" id="btn-save-${p.id}" onclick="guardarEstadoParada(${p.id})">
+                                    <i class="fa-solid fa-floppy-disk"></i>
+                                    <span>Guardar Estado</span>
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setEstadoParada(clienteId, estado) {
+            const card = document.getElementById(`card-parada-${clienteId}`);
+            if (!card) return;
+
+            const btns = card.querySelectorAll('.btn-estado-parada');
+            btns.forEach(b => {
+                b.classList.remove('activo-pendiente', 'activo-entregado', 'activo-rechazado');
+            });
+
+            if (estado === 'pendiente') btns[0]?.classList.add('activo-pendiente');
+            if (estado === 'entregado') btns[1]?.classList.add('activo-entregado');
+            if (estado === 'rechazado') btns[2]?.classList.add('activo-rechazado');
+        }
+
+        async function guardarEstadoParada(clienteId) {
+            if (!rutaActualData || !rutaActualData.token) return;
+
+            const card = document.getElementById(`card-parada-${clienteId}`);
+            if (!card) return;
+
+            let estado = 'pendiente';
+            const btns = card.querySelectorAll('.btn-estado-parada');
+            if (btns[1]?.classList.contains('activo-entregado')) estado = 'entregado';
+            else if (btns[2]?.classList.contains('activo-rechazado')) estado = 'rechazado';
+
+            const obsInput = document.getElementById(`obs-parada-${clienteId}`);
+            const observacion = obsInput ? obsInput.value.trim() : '';
+
+            if ((estado === 'pendiente' || estado === 'rechazado') && observacion === '') {
+                if (typeof ecoAlert === 'function') {
+                    await ecoAlert("Para marcar la parada como PENDIENTE o RECHAZADO debes detallar el motivo en la observación.", "Observación requerida", { type: "warning" });
+                } else {
+                    alert("⚠️ Para marcar la parada como PENDIENTE o RECHAZADO debes detallar el motivo en la observación.");
+                }
+                return;
+            }
+
+            const btn = document.getElementById(`btn-save-${clienteId}`);
+            const originalContent = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+                btn.disabled = true;
+            }
+
+            try {
+                const res = await fetch('/api/actualizar-estado', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        token: rutaActualData.token,
+                        cliente_id: clienteId,
+                        estado: estado,
+                        observacion: observacion
+                    })
+                });
+
+                if (res.ok) {
+                    mostrarToast("Estado de parada guardado exitosamente", "success");
+                    // Update local data
+                    const p = (rutaActualData.puntos || []).find(x => x.id === clienteId);
+                    if (p) {
+                        p.estado = estado;
+                        p.observacion = observacion;
+                    }
+                    renderizarResumenRuta();
+                    renderizarRutaEnMapa();
+
+                    if (btn) {
+                        btn.innerHTML = '<i class="fa-solid fa-check"></i> Guardado';
+                        btn.style.background = '#10b981';
+                        btn.style.color = '#fff';
+                        setTimeout(() => {
+                            btn.innerHTML = originalContent;
+                            btn.style.background = '';
+                            btn.style.color = '';
+                            btn.disabled = false;
+                        }, 2000);
+                    }
+                } else {
+                    const err = await res.json();
+                    mostrarToast(err.message || "Error al actualizar estado", "danger");
+                    if (btn) {
+                        btn.innerHTML = originalContent;
+                        btn.disabled = false;
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                mostrarToast("Fallo de conexión al guardar parada", "danger");
+                if (btn) {
+                    btn.innerHTML = originalContent;
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        async function finalizarRutaChofer() {
+            if (!rutaActualData || !rutaActualData.token) return;
+
+            let confirmar = false;
+            if (typeof ecoConfirm === 'function') {
+                confirmar = await ecoConfirm(
+                    "¿Deseas finalizar la jornada de trabajo de esta ruta? Una vez finalizada no se podrán alterar los estados de recolección.",
+                    "Finalizar Jornada de Ruta",
+                    { confirmText: "Finalizar Jornada", cancelText: "Volver", danger: false }
+                );
+            } else {
+                confirmar = confirm("¿Deseas finalizar la jornada de trabajo de esta ruta?");
+            }
+
+            if (!confirmar) return;
+
+            try {
+                const res = await fetch('/api/finalizar-ruta', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ token: rutaActualData.token })
+                });
+
+                if (res.ok) {
+                    mostrarToast("JORNADA DE RUTA FINALIZADA CON ÉXITO", "success");
+                    await cargarRutaChofer();
+                } else {
+                    const err = await res.json();
+                    mostrarToast(err.message || "Error al finalizar ruta", "danger");
+                }
+            } catch (e) {
+                console.error(e);
+                mostrarToast("Error de conexión al finalizar ruta", "danger");
+            }
+        }
+
+        function renderizarRutaEnMapa() {
+            if (!map) return;
+
+            // Clear previous route polyline and stop markers
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+                routePolyline = null;
+            }
+            routeStopMarkers.forEach(m => map.removeLayer(m));
+            routeStopMarkers = [];
+
+            if (!rutaActualData || !rutaActualData.puntos || rutaActualData.puntos.length === 0) {
+                return;
+            }
+
+            const puntosCoords = [];
+            rutaActualData.puntos.forEach((p, idx) => {
+                const lat = parseFloat(p.lat);
+                const lng = parseFloat(p.lng);
+                if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
+
+                const latlng = [lat, lng];
+                puntosCoords.push(latlng);
+
+                const est = (p.estado || 'pendiente').toLowerCase();
+                const isDenuncia = p.es_denuncia || p.tipo === 'denuncia' || (p.nombre && p.nombre.toLowerCase().startsWith('denuncia'));
+
+                // Exact styling matching user's uploaded screenshot & ruta.html:
+                const pinBg = est === 'entregado' ? '#10B981' : (est === 'rechazado' ? '#EF4444' : (isDenuncia ? '#F59E0B' : '#5B6BFF'));
+                const borderRing = isDenuncia && est === 'pendiente'
+                    ? 'border: 3px solid #FEF08A; box-shadow: 0 0 14px rgba(245, 158, 11, 0.9);'
+                    : 'border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);';
+                const iconText = isDenuncia
+                    ? `<i class="fa-solid fa-triangle-exclamation" style="font-size:9px; margin-right:2px;"></i>${idx + 1}`
+                    : `${idx + 1}`;
+
+                const customIcon = L.divIcon({
+                    className: 'custom-map-pin',
+                    html: `<div style="background:${pinBg}; color:white; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; ${borderRing} cursor:pointer;">${iconText}</div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                });
+
+                const m = L.marker(latlng, { icon: customIcon }).addTo(map);
+                m.clienteId = p.id;
+                m.stopIndex = idx;
+
+                const estadoIcon = est === 'entregado' ? '✅' : (est === 'rechazado' ? '❌' : '🕒');
+                const popupHtml = `
+                    <div style="font-family:'Inter',sans-serif; min-width:210px; color:#0f172a; padding:2px;">
+                        ${isDenuncia ? `
+                            <div style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:800; margin-bottom:6px; display:inline-flex; align-items:center; gap:4px;">
+                                <i class="fa-solid fa-triangle-exclamation"></i> DENUNCIA ASIGNADA ${p.ticket ? `· ${escaparHTML(p.ticket)}` : ''}
+                            </div>
+                        ` : ''}
+                        <div style="font-size:13px; font-weight:700; color:#1e293b; margin-bottom:4px;">
+                            ${idx + 1}. ${escaparHTML(p.nombre)}
+                        </div>
+                        ${p.descripcion ? `
+                            <div style="font-size:11px; color:#475569; background:rgba(0,0,0,0.04); padding:4px 8px; border-radius:4px; margin-bottom:6px; border-left:2px solid #f59e0b;">
+                                "${escaparHTML(p.descripcion)}"
+                            </div>
+                        ` : ''}
+                        <div style="font-size:11px; color:#64748b; margin-bottom:6px;">
+                            <strong>Estado:</strong> ${estadoIcon} ${est.toUpperCase()}
+                            ${p.distancia_siguiente ? `<br><span><i class="fa-solid fa-arrow-right"></i> ${p.distancia_siguiente} km a la siguiente parada</span>` : ''}
+                        </div>
+                        <div style="display:flex; gap:6px; margin-top:8px;">
+                            <button onclick="seleccionarParadaDesdeMapa(${p.id})" style="flex:1; padding:5px 8px; background:#10b981; color:white; border:none; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;">
+                                Ver en Lista
+                            </button>
+                            ${isDenuncia ? `
+                                <button onclick="abrirModalAlerta(${p.id}, '${p.ticket || ''}')" style="padding:5px 8px; background:#f59e0b; color:white; border:none; border-radius:4px; font-size:11px; cursor:pointer;" title="Alerta operativa">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                m.bindPopup(popupHtml);
+                routeStopMarkers.push(m);
+            });
+
+            // Polyline: #5B6BFF dashed line exactly as user uploaded screenshot and ruta.html
+            if (puntosCoords.length > 1) {
+                routePolyline = L.polyline(puntosCoords, {
+                    color: '#5B6BFF',
+                    weight: 4,
+                    opacity: 0.85,
+                    dashArray: '6, 6'
+                }).addTo(map);
+            }
+        }
+
+        function focalizarParadaEnMapa(clienteId) {
+            if (!map || !rutaActualData) return;
+            const p = (rutaActualData.puntos || []).find(x => x.id === clienteId);
+            if (!p || !p.lat || !p.lng) return;
+
+            map.setView([p.lat, p.lng], 16, { animate: true });
+            const m = routeStopMarkers.find(marker => marker.clienteId === clienteId);
+            if (m) m.openPopup();
+        }
+
+        function seleccionarParadaDesdeMapa(clienteId) {
+            cambiarTab('ruta');
+            setTimeout(() => {
+                const card = document.getElementById(`card-parada-${clienteId}`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.transition = 'box-shadow 0.3s ease, border-color 0.3s ease';
+                    card.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.6)';
+                    card.style.borderColor = '#10b981';
+                    setTimeout(() => {
+                        card.style.boxShadow = '';
+                        card.style.borderColor = '';
+                    }, 2500);
+                }
+            }, 100);
+        }
+
+        // Filtering and Tabs
+        function cambiarTab(tab) {
+            activeTabActual = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('viewRuta').style.display = 'none';
+            document.getElementById('viewDenuncias').style.display = 'none';
+            document.getElementById('viewAlertas').style.display = 'none';
+
+            if (tab === 'ruta') {
+                document.getElementById('tabRuta').classList.add('active');
+                document.getElementById('viewRuta').style.display = 'flex';
+            } else if (tab === 'denuncias') {
+                document.getElementById('tabDenuncias').classList.add('active');
+                document.getElementById('viewDenuncias').style.display = 'flex';
+            } else {
+                document.getElementById('tabAlertas').classList.add('active');
+                document.getElementById('viewAlertas').style.display = 'flex';
+            }
+
+            ajustarVistaMapa();
+        }
+
+        function filtrarPorEstado(estado, btn) {
+            filtroEstadoActual = estado;
+            document.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderizarListaDenuncias();
+        }
+
+        function filtrarDenuncias() {
+            renderizarListaDenuncias();
+        }
+
+        // Helpers
+        function formatearCategoria(cat) {
+            if (!cat) return 'Residuos / Denuncia';
+            return cat.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function formatearTipoAlerta(tipo) {
+            const mapTipos = {
+                'averia_vehiculo': 'Avería Mecánica',
+                'calle_bloqueada': 'Acceso Bloqueado',
+                'capacidad_colmada': 'Tolva Llena',
+                'imposibilitado': 'Imposibilitado',
+                'otro': 'Incidente Operativo'
+            };
+            return mapTipos[tipo] || tipo;
+        }
+
+        function escaparHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function mostrarToast(mensaje, tipo = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast-glass ${tipo}`;
+            const icon = tipo === 'success' ? 'fa-check' : (tipo === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-xmark');
+            toast.innerHTML = `
+                <i class="fa-solid ${icon}"></i>
+                <span>${mensaje}</span>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                setTimeout(() => toast.remove(), 400);
+            }, 3500);
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('ecoruta_token');
+            localStorage.removeItem('nexo_token');
+            localStorage.removeItem('ecoruta_user');
+            localStorage.removeItem('ecoruta_rol');
+            localStorage.removeItem('ecoruta_chofer_id');
+            window.location.href = 'login1.html';
+        }
+    </script>
+</body>
+</html>

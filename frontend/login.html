@@ -403,6 +403,9 @@
                     localStorage.setItem('nexo_token', data.token);
                     localStorage.setItem('ecoruta_rol', userRol);
                     localStorage.setItem('nexo_rol', userRol);
+                    if (data.chofer_id) {
+                        localStorage.setItem('ecoruta_chofer_id', data.chofer_id);
+                    }
                     btnText.textContent = 'Acceso concedido';
                     setTimeout(() => {
                         const r = (userRol || '').toLowerCase();
@@ -410,6 +413,8 @@
                             window.location.href = 'admin.html';
                         } else if (r === 'ciudadano') {
                             window.location.href = 'ciudadano.html';
+                        } else if (r === 'chofer') {
+                            window.location.href = 'chofer.html';
                         } else {
                             // gestor (rol operativo unificado) -> panel de rutas + denuncias
                             window.location.href = 'index.html';

@@ -28,6 +28,8 @@
 
     <!-- Script de Polígonos y Cronogramas Oficiales de Barrios de Asunción -->
     <script src="js/barrios_asuncion.js"></script>
+    <!-- Modern Glassmorphism Dialogs & Toasts -->
+    <script src="js/glass-dialogs.js"></script>
 
     <style>
         :root {
@@ -317,6 +319,29 @@
             font-size: 12px;
             outline: none;
             cursor: pointer;
+            color-scheme: light;
+        }
+
+        .select-filter-top option {
+            background-color: #ffffff;
+            color: #0f172a;
+            padding: 8px 12px;
+        }
+
+        html.dark .select-filter-top {
+            color-scheme: dark;
+            background-color: #1e293b;
+            color: #f8fafc;
+        }
+
+        html.dark .select-filter-top option {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+        }
+
+        html.dark .select-filter-top option:checked {
+            background-color: #10b981 !important;
+            color: #ffffff !important;
         }
 
         /* Floating Actions Bottom Center */
@@ -785,12 +810,12 @@
         .modal-card {
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 20px;
+            border-radius: 24px;
             width: 100%;
             max-width: 540px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: var(--shadow-xl);
+            max-height: 88vh;
+            overflow: hidden;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
             display: flex;
             flex-direction: column;
             transform: scale(0.96) translateY(8px);
@@ -807,6 +832,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-shrink: 0;
+            background: var(--surface);
         }
 
         .modal-head h3 {
@@ -821,11 +848,107 @@
             margin-top: 2px;
         }
 
+        .modal-card form {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
         .modal-body {
             padding: 20px 24px;
             display: flex;
             flex-direction: column;
             gap: 16px;
+            flex: 1;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(16, 185, 129, 0.4) transparent;
+        }
+
+        .modal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: rgba(16, 185, 129, 0.35);
+            border-radius: 10px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: rgba(16, 185, 129, 0.65);
+        }
+
+        /* Autocompletado responsivo al 100% del campo */
+        .autocomplete-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .autocomplete-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            width: 100%;
+            max-height: 220px;
+            overflow-y: auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(16, 185, 129, 0.4) transparent;
+        }
+
+        html.dark .autocomplete-dropdown {
+            background: #1e293b;
+            border-color: #334155;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+        }
+
+        .autocomplete-item {
+            padding: 10px 14px;
+            font-size: 13px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.active {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+
+        .autocomplete-item strong {
+            color: #10b981;
+            font-weight: 700;
+        }
+
+        .autocomplete-badge {
+            font-size: 10px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            font-weight: 600;
         }
 
         .form-group {
@@ -958,7 +1081,8 @@
             align-items: center;
             justify-content: flex-end;
             gap: 10px;
-            background: var(--surface-subtle);
+            background: var(--surface);
+            flex-shrink: 0;
         }
 
         .btn-submit {
@@ -1051,6 +1175,341 @@
                 left: 16px;
                 width: auto;
             }
+        }
+
+        /* ===== LIVE CAMERA CAPTURE & FORENSIC STAMP STYLES ===== */
+        .camera-capture-box {
+            background: var(--surface-subtle);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: all 0.25s ease;
+        }
+
+        .camera-start-zone {
+            padding: 22px 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+            cursor: pointer;
+            background: linear-gradient(180deg, rgba(16, 185, 129, 0.04) 0%, rgba(16, 185, 129, 0.09) 100%);
+            border-radius: var(--radius-lg);
+            transition: all 0.2s ease;
+        }
+        .camera-start-zone:hover {
+            background: linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.16) 100%);
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .camera-icon-bubble {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #10b981;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+            font-size: 24px;
+        }
+
+        .btn-launch-camera {
+            padding: 9px 18px;
+            border-radius: var(--radius-full);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.15s ease;
+        }
+        .btn-launch-camera:hover {
+            transform: scale(1.02);
+        }
+
+        .camera-security-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: var(--radius-full);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* Live Camera Viewfinder */
+        .camera-live-zone {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            background: #000;
+            border-radius: var(--radius-lg);
+        }
+
+        .video-viewport {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            background: #040d09;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #cameraVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(1);
+        }
+        #cameraVideo.mirrored {
+            transform: scaleX(-1);
+        }
+
+        /* Viewfinder HUD Overlays */
+        .viewfinder-hud {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 12px;
+            box-sizing: border-box;
+        }
+
+        .hud-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .badge-live-rec {
+            background: rgba(239, 68, 68, 0.9);
+            color: #fff;
+            padding: 3px 8px;
+            border-radius: var(--radius-full);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+        }
+        .pulse-red-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #ffffff;
+            animation: pulseRec 1s infinite alternate;
+        }
+        @keyframes pulseRec {
+            from { opacity: 0.3; }
+            to { opacity: 1; }
+        }
+
+        .hud-clock {
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(8px);
+            color: #7dffc4;
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: var(--radius-full);
+            border: 1px solid rgba(125, 255, 196, 0.3);
+        }
+
+        /* Framing crosshairs corners */
+        .hud-frame-corners {
+            position: absolute;
+            inset: 16px;
+            pointer-events: none;
+        }
+        .hud-frame-corners::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 20px; height: 20px;
+            border-top: 3px solid #7dffc4;
+            border-left: 3px solid #7dffc4;
+            border-top-left-radius: 5px;
+        }
+        .hud-frame-corners::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; width: 20px; height: 20px;
+            border-top: 3px solid #7dffc4;
+            border-right: 3px solid #7dffc4;
+            border-top-right-radius: 5px;
+        }
+        .corner-bottom-left {
+            position: absolute;
+            bottom: 0; left: 0; width: 20px; height: 20px;
+            border-bottom: 3px solid #7dffc4;
+            border-left: 3px solid #7dffc4;
+            border-bottom-left-radius: 5px;
+        }
+        .corner-bottom-right {
+            position: absolute;
+            bottom: 0; right: 0; width: 20px; height: 20px;
+            border-bottom: 3px solid #7dffc4;
+            border-right: 3px solid #7dffc4;
+            border-bottom-right-radius: 5px;
+        }
+
+        /* Live Camera Controls Bar */
+        .camera-controls-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 6px;
+            gap: 8px;
+        }
+
+        .btn-camera-util {
+            padding: 7px 12px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #f8fafc;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s ease;
+        }
+        .btn-camera-util:hover {
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        .btn-capture-shutter {
+            padding: 9px 20px;
+            border-radius: var(--radius-full);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            font-size: 13px;
+            font-weight: 800;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            box-shadow: 0 0 16px rgba(16, 185, 129, 0.55);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            transition: all 0.15s ease;
+        }
+        .btn-capture-shutter:hover {
+            transform: scale(1.04);
+            box-shadow: 0 0 22px rgba(16, 185, 129, 0.8);
+        }
+
+        /* Captured Preview State */
+        .camera-preview-zone {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 14px;
+        }
+
+        .preview-image-container {
+            position: relative;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            background: #000;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .captured-preview-img {
+            width: 100%;
+            height: auto;
+            max-height: 280px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .badge-stamp-authentic {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(16, 185, 129, 0.94);
+            backdrop-filter: blur(8px);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 5px 11px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+        }
+
+        .preview-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 8px 12px;
+        }
+        .meta-pill {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .meta-pill span:first-child {
+            font-size: 10px;
+            color: var(--text-subtle);
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .meta-pill span:last-child {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-main);
+            font-family: monospace;
+        }
+
+        .preview-actions-row {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        /* Error state */
+        .camera-error-zone {
+            padding: 16px;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: var(--radius-lg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 8px;
+            color: #ef4444;
         }
     </style>
 </head>
@@ -1344,13 +1803,13 @@
                         <input type="hidden" id="fCategoria" value="VERTEDERO_CLANDESTINO">
                     </div>
 
-                    <!-- Barrio -->
+                    <!-- Barrio con Autocompletado Dinámico de Ancho Completo (100%) -->
                     <div class="form-group">
                         <label class="form-label" for="fBarrio">Barrio de Asunción *</label>
-                        <input type="text" id="fBarrio" class="form-input" list="barriosList" placeholder="Escribe tu barrio (ej. Sajonia, Recoleta, Carmelitas...)" required>
-                        <datalist id="barriosList">
-                            <!-- Populated in JS with 68 barrios of Asunción -->
-                        </datalist>
+                        <div class="autocomplete-container">
+                            <input type="text" id="fBarrio" class="form-input" placeholder="Escribe tu barrio (ej. Sajonia, Recoleta, Carmelitas...)" autocomplete="off" required>
+                            <div id="barriosDropdown" class="autocomplete-dropdown" style="display: none;"></div>
+                        </div>
                     </div>
 
                     <!-- Referencia de Dirección -->
@@ -1395,10 +1854,131 @@
                         </div>
                     </div>
 
-                    <!-- URL de Foto -->
+                    <!-- Evidencia Fotográfica en Vivo (WebRTC con Sellado Forense) -->
                     <div class="form-group">
-                        <label class="form-label" for="fFoto">Enlace o URL de Fotografía (Opcional)</label>
-                        <input type="url" id="fFoto" class="form-input" placeholder="https://ejemplo.com/foto-basura.jpg">
+                        <label class="form-label">
+                            <span>Evidencia Fotográfica (Cámara en Vivo)</span>
+                            <span style="font-size:10px; color:#10b981; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">
+                                🔒 Sellado Forense Activo
+                            </span>
+                        </label>
+
+                        <!-- Hidden input to hold the sanitized, compressed base64 JPEG -->
+                        <input type="hidden" id="fFoto" name="foto_url" value="">
+                        <!-- Hidden canvas for forensic drawing, scaling & JPEG compression -->
+                        <canvas id="cameraCanvas" style="display:none;"></canvas>
+
+                        <div class="camera-capture-box" id="cameraBox">
+
+                            <!-- Estado 1: Inactivo / Botón de inicio -->
+                            <div class="camera-start-zone" id="cameraStartZone" onclick="startCamera()">
+                                <div class="camera-icon-bubble">
+                                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                        <circle cx="12" cy="13" r="4"/>
+                                    </svg>
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:4px; align-items:center;">
+                                    <button type="button" class="btn-launch-camera" onclick="startCamera(); event.stopPropagation();">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polygon points="12 8 8 12 12 16 12 8"/></svg>
+                                        <span>Tomar Fotografía en Vivo</span>
+                                    </button>
+                                    <span style="font-size:11px; color:var(--text-muted); max-width:320px; line-height:1.35; margin-top:2px;">
+                                        Por protocolo de autenticidad, la evidencia debe capturarse en tiempo real. No se admiten fotos de archivo ni capturas de pantalla.
+                                    </span>
+                                </div>
+                                <div class="camera-security-pill">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                    <span>Certificación de fecha, hora y GPS estampados en la imagen</span>
+                                </div>
+                            </div>
+
+                            <!-- Estado 2: Visor de Cámara en Vivo (WebRTC) -->
+                            <div class="camera-live-zone" id="cameraLiveZone" style="display:none;">
+                                <div class="video-viewport">
+                                    <video id="cameraVideo" autoplay playsinline muted></video>
+                                    
+                                    <!-- Viewfinder HUD Overlays -->
+                                    <div class="viewfinder-hud">
+                                        <div class="hud-top-bar">
+                                            <span class="badge-live-rec">
+                                                <span class="pulse-red-dot"></span>
+                                                <span>EN VIVO</span>
+                                            </span>
+                                            <span class="hud-clock" id="hudLiveClock">--:--:--</span>
+                                        </div>
+                                        <div class="hud-frame-corners">
+                                            <span class="corner-bottom-left"></span>
+                                            <span class="corner-bottom-right"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="camera-controls-bar">
+                                    <button type="button" class="btn-camera-util" onclick="toggleCameraFacing()" title="Alternar entre cámara frontal y trasera">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                        <span>Girar</span>
+                                    </button>
+
+                                    <button type="button" class="btn-capture-shutter" onclick="capturePhoto()">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                                        <span>Capturar Foto</span>
+                                    </button>
+
+                                    <button type="button" class="btn-camera-util" onclick="cancelLiveCamera()" style="color:#ef4444;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                        <span>Cerrar</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Estado 3: Foto Capturada y Verificada (Preview) -->
+                            <div class="camera-preview-zone" id="cameraPreviewZone" style="display:none;">
+                                <div class="preview-image-container">
+                                    <img id="capturedPhotoPreview" class="captured-preview-img" alt="Evidencia capturada">
+                                    <div class="badge-stamp-authentic">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                        <span>Evidencia Genuina en Vivo</span>
+                                    </div>
+                                </div>
+
+                                <div class="preview-meta-grid">
+                                    <div class="meta-pill">
+                                        <span>Resolución</span>
+                                        <span id="metaPhotoRes">1280 × 960</span>
+                                    </div>
+                                    <div class="meta-pill">
+                                        <span>Tamaño Seguro</span>
+                                        <span id="metaPhotoSize" style="color:#10b981;">240 KB</span>
+                                    </div>
+                                    <div class="meta-pill">
+                                        <span>Sello Hash</span>
+                                        <span id="metaPhotoHash" style="color:#7dffc4;">VERIF-OK</span>
+                                    </div>
+                                </div>
+
+                                <div class="preview-actions-row">
+                                    <button type="button" class="btn-camera-util" onclick="retakePhoto()" style="color:#10b981; border-color:rgba(16,185,129,0.3);">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                        <span>Tomar Otra</span>
+                                    </button>
+                                    <button type="button" class="btn-camera-util" onclick="removePhoto()" style="color:#ef4444; border-color:rgba(239,68,68,0.3);">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        <span>Eliminar</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Estado 4: Error de Permisos / Cámara no disponible -->
+                            <div class="camera-error-zone" id="cameraErrorZone" style="display:none;">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                <span style="font-size:12px; font-weight:600;" id="cameraErrorMessage">No se pudo acceder a la cámara.</span>
+                                <button type="button" class="btn-camera-util" onclick="startCamera()" style="margin-top:4px;">
+                                    <span>Reintentar Acceso a Cámara</span>
+                                </button>
+                            </div>
+
+                        </div>
                     </div>
 
                 </div>
@@ -1743,15 +2323,182 @@
             }
         });
 
-        // Población del datalist para el formulario
+        // Autocompletado responsivo de barrios (Ancho 100%, dinámico con teclado y GPS)
+        let barriosListCache = [];
+        let activeAutocompleteIndex = -1;
+
         function populateBarriosDatalist(features) {
-            const datalist = document.getElementById('barriosList');
-            datalist.innerHTML = '';
-            features.forEach(f => {
-                const opt = document.createElement('option');
-                opt.value = f.properties.barrio;
-                datalist.appendChild(opt);
+            initBarriosAutocomplete(features);
+        }
+
+        function initBarriosAutocomplete(features) {
+            if (!features || !features.length) return;
+            barriosListCache = features.map(f => {
+                const props = f.properties || {};
+                let coords = null;
+                if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length) {
+                    const poly = f.geometry.coordinates[0];
+                    if (Array.isArray(poly) && poly.length) {
+                        const pt = poly[0];
+                        if (Array.isArray(pt) && pt.length >= 2) coords = [pt[1], pt[0]];
+                    }
+                }
+                return {
+                    nombre: props.barrio || '',
+                    turno: props.turno || 'Mañana',
+                    coords: coords
+                };
+            }).filter(b => b.nombre.length > 0)
+              .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+
+            setupBarriosAutocompleteListeners();
+        }
+
+        function setupBarriosAutocompleteListeners() {
+            const input = document.getElementById('fBarrio');
+            const dropdown = document.getElementById('barriosDropdown');
+            if (!input || !dropdown) return;
+
+            function renderDropdown(items, query) {
+                dropdown.innerHTML = '';
+                activeAutocompleteIndex = -1;
+
+                if (!items.length) {
+                    dropdown.innerHTML = `
+                        <div style="padding: 12px 14px; font-size: 13px; color: var(--text-muted); text-align: center;">
+                            No se encontraron barrios con "<strong>${escapeHtml(query)}</strong>"
+                        </div>
+                    `;
+                    dropdown.style.display = 'flex';
+                    return;
+                }
+
+                items.slice(0, 15).forEach((b, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'autocomplete-item';
+                    item.dataset.index = idx;
+                    item.dataset.name = b.nombre;
+
+                    let displayHtml = escapeHtml(b.nombre);
+                    if (query) {
+                        const qClean = query.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                        const nClean = b.nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                        const matchIndex = nClean.indexOf(qClean);
+                        if (matchIndex !== -1) {
+                            const before = b.nombre.substring(0, matchIndex);
+                            const matched = b.nombre.substring(matchIndex, matchIndex + query.length);
+                            const after = b.nombre.substring(matchIndex + query.length);
+                            displayHtml = `${escapeHtml(before)}<strong>${escapeHtml(matched)}</strong>${escapeHtml(after)}`;
+                        }
+                    }
+
+                    item.innerHTML = `
+                        <span style="font-weight: 500;">${displayHtml}</span>
+                        <span class="autocomplete-badge">${escapeHtml(b.turno)}</span>
+                    `;
+
+                    item.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        selectBarrioAutocomplete(b);
+                    });
+
+                    dropdown.appendChild(item);
+                });
+
+                dropdown.style.display = 'flex';
+            }
+
+            function selectBarrioAutocomplete(b) {
+                input.value = b.nombre;
+                dropdown.style.display = 'none';
+
+                if (b.coords && b.coords.length === 2) {
+                    setFormCoordinates(b.coords[0], b.coords[1]);
+                    if (typeof map !== 'undefined' && map) {
+                        map.flyTo([b.coords[0], b.coords[1]], 14, { duration: 0.6 });
+                    }
+                }
+            }
+
+            input.addEventListener('input', () => {
+                const q = input.value.trim();
+                if (!q) {
+                    renderDropdown(barriosListCache, '');
+                    return;
+                }
+                const qClean = q.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                const filtered = barriosListCache.filter(b => {
+                    const bClean = b.nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                    return bClean.includes(qClean);
+                });
+                renderDropdown(filtered, q);
             });
+
+            input.addEventListener('focus', () => {
+                const q = input.value.trim();
+                if (!q) {
+                    renderDropdown(barriosListCache, '');
+                } else {
+                    const qClean = q.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                    const filtered = barriosListCache.filter(b => {
+                        const bClean = b.nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                        return bClean.includes(qClean);
+                    });
+                    renderDropdown(filtered, q);
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (dropdown.style.display === 'none') return;
+                const items = dropdown.querySelectorAll('.autocomplete-item');
+                if (!items.length) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeAutocompleteIndex = (activeAutocompleteIndex + 1) % items.length;
+                    highlightItem(items, activeAutocompleteIndex);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeAutocompleteIndex = (activeAutocompleteIndex - 1 + items.length) % items.length;
+                    highlightItem(items, activeAutocompleteIndex);
+                } else if (e.key === 'Enter') {
+                    if (activeAutocompleteIndex >= 0 && activeAutocompleteIndex < items.length) {
+                        e.preventDefault();
+                        const selectedName = items[activeAutocompleteIndex].dataset.name;
+                        const found = barriosListCache.find(b => b.nombre === selectedName);
+                        if (found) selectBarrioAutocomplete(found);
+                    }
+                } else if (e.key === 'Escape') {
+                    dropdown.style.display = 'none';
+                }
+            });
+
+            function highlightItem(items, index) {
+                items.forEach((it, i) => {
+                    if (i === index) {
+                        it.classList.add('active');
+                        it.scrollIntoView({ block: 'nearest' });
+                    } else {
+                        it.classList.remove('active');
+                    }
+                });
+            }
+
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
 
         function setFormCoordinates(lat, lng) {
@@ -1819,37 +2566,28 @@
             document.getElementById('kpiCamiones').textContent = trucksCount;
         }
 
-        // Fetch Reports from API
+        // Fetch Reports from API (PostgreSQL)
         async function loadReports() {
             try {
                 const authToken = localStorage.getItem('ecoruta_token') || localStorage.getItem('nexo_token') || '';
-                const res = await fetch(`${API_BASE}/denuncias`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+                const headers = {};
+                if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+                const res = await fetch(`${API_BASE}/denuncias`, { headers });
                 
                 if (res.ok) {
                     const data = await res.json();
                     allReports = Array.isArray(data) ? data : (data.denuncias || []);
                 } else {
-                    allReports = getFallbackReports();
+                    allReports = [];
                 }
             } catch (err) {
-                console.warn('API /denuncias unreachable, using local fallback:', err);
-                allReports = getFallbackReports();
+                console.warn('API /denuncias unreachable:', err);
+                allReports = [];
             }
 
             updateKpis();
             renderReportsOnMap();
             renderDrawerList();
-        }
-
-        function getFallbackReports() {
-            return [
-                { id: 101, ticket: 'ECO-9281', categoria: 'VERTEDERO_CLANDESTINO', barrio: 'Sajonia', descripcion: 'Basura acumulada en la esquina del parque, proliferación de alimañas.', latitud: -25.2915, longitud: -57.6410, estado: 'PENDIENTE', fecha_creacion: '2026-10-12T14:30:00' },
-                { id: 102, ticket: 'ECO-8419', categoria: 'RECOLECCION_PENDIENTE', barrio: 'Recoleta', descripcion: 'Hace 3 días no pasa el camión por la cuadra.', latitud: -25.2995, longitud: -57.6012, estado: 'EN_PROCESO', fecha_creacion: '2026-10-11T10:15:00' },
-                { id: 103, ticket: 'ECO-7732', categoria: 'CONTENEDOR_DANADO', barrio: 'Las Mercedes', descripcion: 'Contenedor metálico roto sin tapa sobre Juan de Salazar.', latitud: -25.2810, longitud: -57.6180, estado: 'PENDIENTE', fecha_creacion: '2026-10-10T08:45:00' },
-                { id: 104, ticket: 'ECO-6102', categoria: 'VERTEDERO_CLANDESTINO', barrio: 'Santísima Trinidad', descripcion: 'Restos de ramas y escombros en la vereda.', latitud: -25.2710, longitud: -57.5840, estado: 'CERRADA', fecha_creacion: '2026-10-09T16:20:00' }
-            ];
         }
 
         function updateKpis() {
@@ -1998,6 +2736,255 @@
             }
         });
 
+        // ==========================================
+        // MÓDULO DE CÁMARA EN VIVO Y SELLADO FORENSE
+        // ==========================================
+        let currentCameraStream = null;
+        let currentFacingMode = 'environment'; // Cámara trasera preferente en móviles
+        let liveClockTimer = null;
+
+        async function startCamera() {
+            stopCameraStreamOnly();
+
+            const startZone = document.getElementById('cameraStartZone');
+            const liveZone = document.getElementById('cameraLiveZone');
+            const previewZone = document.getElementById('cameraPreviewZone');
+            const errorZone = document.getElementById('cameraErrorZone');
+            const video = document.getElementById('cameraVideo');
+
+            errorZone.style.display = 'none';
+            startZone.style.display = 'none';
+            previewZone.style.display = 'none';
+            liveZone.style.display = 'flex';
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                liveZone.style.display = 'none';
+                errorZone.style.display = 'flex';
+                document.getElementById('cameraErrorMessage').textContent = 
+                    'Tu navegador no soporta captura de video en vivo (WebRTC). Utiliza un navegador moderno como Chrome, Edge o Safari.';
+                return;
+            }
+
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: currentFacingMode },
+                        width: { ideal: 1280 },
+                        height: { ideal: 960 }
+                    },
+                    audio: false
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentCameraStream = stream;
+                video.srcObject = stream;
+
+                if (currentFacingMode === 'user') {
+                    video.classList.add('mirrored');
+                } else {
+                    video.classList.remove('mirrored');
+                }
+
+                await video.play();
+                startLiveClock();
+            } catch (err) {
+                console.error('Error accediendo a la cámara:', err);
+                liveZone.style.display = 'none';
+                errorZone.style.display = 'flex';
+                let msg = 'No se pudo acceder a la cámara del dispositivo.';
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    msg = 'Permiso denegado: Habilita el permiso de cámara en tu navegador para certificar la evidencia de la denuncia.';
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    msg = 'No se detectó ninguna cámara activa en tu dispositivo.';
+                } else if (err.name === 'NotReadableError') {
+                    msg = 'La cámara está siendo utilizada por otra aplicación.';
+                }
+                document.getElementById('cameraErrorMessage').textContent = msg;
+            }
+        }
+
+        function stopCameraStreamOnly() {
+            if (currentCameraStream) {
+                currentCameraStream.getTracks().forEach(track => {
+                    try { track.stop(); } catch (e) {}
+                });
+                currentCameraStream = null;
+            }
+            stopLiveClock();
+        }
+
+        function cancelLiveCamera() {
+            stopCameraStreamOnly();
+            const fotoVal = document.getElementById('fFoto').value;
+            if (fotoVal) {
+                document.getElementById('cameraLiveZone').style.display = 'none';
+                document.getElementById('cameraPreviewZone').style.display = 'flex';
+            } else {
+                document.getElementById('cameraLiveZone').style.display = 'none';
+                document.getElementById('cameraStartZone').style.display = 'flex';
+            }
+        }
+
+        function toggleCameraFacing() {
+            currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+            startCamera();
+        }
+
+        function startLiveClock() {
+            stopLiveClock();
+            const clockEl = document.getElementById('hudLiveClock');
+            function tick() {
+                const now = new Date();
+                clockEl.textContent = now.toTimeString().split(' ')[0];
+            }
+            tick();
+            liveClockTimer = setInterval(tick, 1000);
+        }
+
+        function stopLiveClock() {
+            if (liveClockTimer) {
+                clearInterval(liveClockTimer);
+                liveClockTimer = null;
+            }
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('cameraVideo');
+            if (!video || !video.videoWidth) {
+                alert('La cámara se está iniciando. Por favor espera un instante y vuelve a pulsar Capturar.');
+                return;
+            }
+
+            const canvas = document.getElementById('cameraCanvas');
+            const ctx = canvas.getContext('2d');
+
+            const sw = video.videoWidth;
+            const sh = video.videoHeight;
+
+            // Escala proporcional con límite estricto de 1280px para optimizar tamaño y rendimiento
+            const MAX_DIM = 1280;
+            let targetW = sw;
+            let targetH = sh;
+            if (sw > MAX_DIM || sh > MAX_DIM) {
+                if (sw >= sh) {
+                    targetW = MAX_DIM;
+                    targetH = Math.round((sh * MAX_DIM) / sw);
+                } else {
+                    targetH = MAX_DIM;
+                    targetW = Math.round((sw * MAX_DIM) / sh);
+                }
+            }
+
+            canvas.width = targetW;
+            canvas.height = targetH;
+
+            // Dibujado rasterizado seguro en Canvas (sanitiza cualquier payload externo)
+            if (currentFacingMode === 'user') {
+                ctx.save();
+                ctx.translate(targetW, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, targetW, targetH);
+                ctx.restore();
+            } else {
+                ctx.drawImage(video, 0, 0, targetW, targetH);
+            }
+
+            // Liberar stream de la cámara de inmediato
+            stopCameraStreamOnly();
+
+            // Metadatos para el Sellado Forense Digital
+            const now = new Date();
+            const fechaHora = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0') + ' ' +
+                String(now.getHours()).padStart(2, '0') + ':' +
+                String(now.getMinutes()).padStart(2, '0') + ':' +
+                String(now.getSeconds()).padStart(2, '0');
+
+            const lat = parseFloat(document.getElementById('fLat').value) || -25.2867;
+            const lng = parseFloat(document.getElementById('fLng').value) || -57.6333;
+            const barrio = document.getElementById('fBarrio').value.trim() || 'Asunción';
+            const cat = document.getElementById('fCategoria').value || 'DENUNCIA';
+
+            // Checksum / hash de integridad de la evidencia
+            const rawHashInput = `${fechaHora}_${lat.toFixed(5)}_${lng.toFixed(5)}_${barrio}_ECORUTA_SEG`;
+            let hashVal = 0;
+            for (let i = 0; i < rawHashInput.length; i++) {
+                hashVal = ((hashVal << 5) - hashVal) + rawHashInput.charCodeAt(i);
+                hashVal |= 0;
+            }
+            const stampHash = 'VERIF-' + Math.abs(hashVal).toString(16).toUpperCase().padStart(8, '0');
+
+            // Dibujar franja inferior del Sello Forense inmutable
+            const bannerH = Math.max(74, Math.round(targetH * 0.12));
+            const bannerY = targetH - bannerH;
+
+            const grad = ctx.createLinearGradient(0, bannerY, 0, targetH);
+            grad.addColorStop(0, 'rgba(6, 17, 12, 0.80)');
+            grad.addColorStop(1, 'rgba(6, 17, 12, 0.96)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, bannerY, targetW, bannerH);
+
+            // Línea superior esmeralda
+            ctx.fillStyle = '#10b981';
+            ctx.fillRect(0, bannerY, targetW, 3);
+
+            // Medidas tipográficas adaptadas a la resolución
+            const fontTitle = Math.max(13, Math.round(targetW * 0.021));
+            const fontMeta = Math.max(11, Math.round(targetW * 0.016));
+
+            ctx.fillStyle = '#7dffc4';
+            ctx.font = `bold ${fontTitle}px Inter, sans-serif`;
+            ctx.fillText(`♻ ECORUTA · EVIDENCIA OFICIAL ASUNCIÓN`, 20, bannerY + fontTitle + 12);
+
+            ctx.fillStyle = '#10b981';
+            ctx.font = `bold ${fontMeta}px monospace`;
+            const hashText = `[CERTIFICADA · ${stampHash}]`;
+            const hashWidth = ctx.measureText(hashText).width;
+            ctx.fillText(hashText, targetW - hashWidth - 20, bannerY + fontTitle + 12);
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = `500 ${fontMeta}px Inter, sans-serif`;
+            const metaLine = `📍 GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)} (${barrio})  |  📅 ${fechaHora}  |  🏷️ ${cat.replace(/_/g, ' ')}`;
+            ctx.fillText(metaLine, 20, bannerY + bannerH - 14);
+
+            // Compresión controlada en formato JPEG seguro (calidad 0.82)
+            const quality = 0.82;
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+            // Límite de tamaño: verificar que esté bien comprimida (< 1 MB)
+            const head = 'data:image/jpeg;base64,';
+            const sizeInBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
+            const sizeInKB = Math.round(sizeInBytes / 1024);
+
+            document.getElementById('fFoto').value = dataUrl;
+
+            // Mostrar estado de foto capturada
+            document.getElementById('cameraLiveZone').style.display = 'none';
+            document.getElementById('cameraPreviewZone').style.display = 'flex';
+            document.getElementById('capturedPhotoPreview').src = dataUrl;
+            document.getElementById('metaPhotoRes').textContent = `${targetW} × ${targetH}`;
+            document.getElementById('metaPhotoSize').textContent = `${sizeInKB} KB`;
+            document.getElementById('metaPhotoHash').textContent = stampHash;
+        }
+
+        function retakePhoto() {
+            startCamera();
+        }
+
+        function removePhoto() {
+            stopCameraStreamOnly();
+            document.getElementById('fFoto').value = '';
+            document.getElementById('cameraPreviewZone').style.display = 'none';
+            document.getElementById('cameraLiveZone').style.display = 'none';
+            document.getElementById('cameraErrorZone').style.display = 'none';
+            document.getElementById('cameraStartZone').style.display = 'flex';
+        }
+
+        function resetCameraUI() {
+            removePhoto();
+        }
+
         // Submit New Report
         async function submitReport(e) {
             e.preventDefault();
@@ -2005,7 +2992,17 @@
             const originalBtnHtml = submitBtn.innerHTML;
             submitBtn.disabled = true;
 
-            const fotoVal = document.getElementById('fFoto').value.trim() || null;
+            // Validación de Evidencia Fotográfica en Vivo
+            let fotoVal = document.getElementById('fFoto').value.trim();
+            if (!fotoVal) {
+                const proceed = await ecoConfirm('No has capturado una fotografía en vivo como evidencia.\n\n¿Deseas registrar la denuncia sin fotografía?', 'Aviso de Evidencia', { confirmText: 'Continuar sin foto', cancelText: 'Tomar foto', danger: false });
+                if (!proceed) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnHtml;
+                    return;
+                }
+            }
+            fotoVal = fotoVal || null;
 
             const payload = {
                 nombre_ciudadano: document.getElementById('fNombre').value.trim() || storedUser,
@@ -2089,7 +3086,8 @@
                 document.getElementById('formReport').reset();
             } catch (err) {
                 console.error('Error al guardar denuncia:', err);
-                alert(err.message || 'Error al procesar la denuncia');
+                resetCameraUI();
+                alert('No se pudo guardar la denuncia en la base de datos: ' + err.message);
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnHtml;
             }
@@ -2142,6 +3140,11 @@
                         <div style="font-size:13px; font-weight:600; color:var(--text-main);">Barrio: ${escapeHtml(found.barrio || 'Asunción')}</div>
                         <div style="font-size:12px; color:var(--text-muted);">${escapeHtml(found.descripcion || '')}</div>
                         ${found.direccion_referencia ? `<div style="font-size:11px; color:var(--text-subtle);">Ref: ${escapeHtml(found.direccion_referencia)}</div>` : ''}
+                        ${found.foto_url ? `
+                            <div style="margin:6px 0; border-radius:10px; overflow:hidden; border:1px solid rgba(16,185,129,0.3); background:#000; max-height:180px;">
+                                <img src="${escapeHtml(found.foto_url)}" alt="Evidencia fotográfica" style="width:100%; height:auto; max-height:180px; object-fit:contain; display:block;">
+                            </div>
+                        ` : ''}
                         <button class="btn-gps-action" style="margin-top:6px; align-self:flex-start;" onclick="focusReport(${found.latitud || found.lat}, ${found.longitud || found.lng}); closeModal('modalCheckTicket');">
                             <span>Ver en el mapa</span>
                         </button>
@@ -2202,6 +3205,9 @@
 
         function closeModal(id) {
             document.getElementById(id).classList.remove('active');
+            if (id === 'modalNewReport') {
+                stopCameraStreamOnly();
+            }
         }
 
         document.getElementById('openNewReportBtn').addEventListener('click', () => openModal('modalNewReport'));

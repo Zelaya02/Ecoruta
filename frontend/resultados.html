@@ -18,6 +18,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
+    <script src="js/glass-dialogs.js"></script>
     <style>
         * {
             margin: 0;
@@ -236,7 +237,7 @@
 
         .asignacion-panel select {
             width: 100%;
-            padding: 10px 12px;
+            padding: 10px 14px;
             border-radius: 16px;
             border: 1px solid var(--border-light);
             background: var(--card-white);
@@ -247,10 +248,53 @@
             transition: var(--transition);
         }
 
-        .asignacion-panel select:focus {
+        .asignacion-panel select:focus,
+        #selectMovilDestino:focus {
             outline: none;
             border-color: var(--secondary);
             box-shadow: 0 0 0 2px rgba(245, 176, 65, 0.2);
+        }
+
+        #selectMovilDestino {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-light);
+            background: var(--card-white);
+            color: var(--text-dark);
+            font-family: inherit;
+            font-size: 14px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .asignacion-panel select option,
+        #selectMovilDestino option {
+            background-color: #ffffff;
+            color: #0d281e;
+            padding: 10px 14px;
+        }
+
+        body.dark-mode .asignacion-panel select,
+        body.dark-mode #selectMovilDestino {
+            color-scheme: dark;
+            background-color: #0e261d !important;
+            color: #f2fbf6 !important;
+        }
+
+        body.dark-mode .asignacion-panel select option,
+        body.dark-mode #selectMovilDestino option {
+            background-color: #0e261d !important;
+            color: #f2fbf6 !important;
+            padding: 10px 14px;
+        }
+
+        body.dark-mode .asignacion-panel select option:checked,
+        body.dark-mode #selectMovilDestino option:checked {
+            background-color: #237a46 !important;
+            color: #ffffff !important;
+            font-weight: 600;
         }
 
         /* Lista de clientes */

@@ -28,6 +28,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="css/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="js/glass-dialogs.js"></script>
     <style>
         /* Critical loading overlay CSS - inline fallback in case css/style.css fails to load */
         .loading-overlay {
@@ -354,8 +355,25 @@
         }
 
         .select-filter option {
-            background: var(--card-light);
-            color: var(--text-light);
+            background-color: #ffffff;
+            color: #0d281e;
+            padding: 8px 12px;
+        }
+
+        body.dark-mode .select-filter {
+            color-scheme: dark;
+            background-color: #0e261d !important;
+            color: #f2fbf6 !important;
+        }
+
+        body.dark-mode .select-filter option {
+            background-color: #0e261d !important;
+            color: #f2fbf6 !important;
+        }
+
+        body.dark-mode .select-filter option:checked {
+            background-color: #237a46 !important;
+            color: #ffffff !important;
         }
 
         .actions-group {
@@ -464,6 +482,24 @@
             font-weight: 500;
         }
 
+        body.dark-mode select.control-input,
+        body.dark-mode select.control-input option,
+        body.dark-mode select.select-filter,
+        body.dark-mode select.select-filter option,
+        body.dark-mode select.glass-select,
+        body.dark-mode select.glass-select option {
+            color-scheme: dark;
+            background-color: #0e261d !important;
+            color: #f2fbf6 !important;
+        }
+
+        body.dark-mode select.control-input option:checked,
+        body.dark-mode select.select-filter option:checked,
+        body.dark-mode select.glass-select option:checked {
+            background-color: #237a46 !important;
+            color: #ffffff !important;
+        }
+
         input[type="number"].control-input,
         input[type="text"].control-input {
             color: var(--text-light) !important;
@@ -544,15 +580,35 @@
             box-shadow: 0 4px 10px rgba(26, 75, 95, 0.15);
         }
 
-        /* Tabla */
         .table-wrapper {
             background: var(--card-light);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border-radius: 28px;
+            border-radius: 24px;
             overflow: auto;
             border: var(--card-border);
             box-shadow: var(--card-shadow);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(63, 168, 125, 0.4) transparent;
+        }
+
+        .table-wrapper::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-track {
+            background: transparent;
+            margin: 12px 0;
+        }
+
+        .table-wrapper::-webkit-scrollbar-thumb {
+            background: rgba(63, 168, 125, 0.35);
+            border-radius: 8px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: rgba(63, 168, 125, 0.65);
         }
 
         .client-table {
@@ -638,13 +694,35 @@
 
         .modal-container {
             background: var(--card-light);
-            border-radius: 36px;
-            padding: 32px;
+            border-radius: 28px;
+            padding: 28px 32px;
             max-width: 600px;
             width: 90%;
-            max-height: 85vh;
-            overflow: auto;
+            max-height: 88vh;
+            overflow-y: auto;
+            overflow-x: hidden;
             border: 1px solid var(--border-light);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(63, 168, 125, 0.4) transparent;
+        }
+
+        .modal-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal-container::-webkit-scrollbar-track {
+            background: transparent;
+            margin: 18px 0;
+        }
+
+        .modal-container::-webkit-scrollbar-thumb {
+            background: rgba(63, 168, 125, 0.35);
+            border-radius: 10px;
+        }
+
+        .modal-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(63, 168, 125, 0.7);
         }
 
         .footer {
@@ -828,6 +906,230 @@
         .toolbar-card, .table-wrapper {
             flex-shrink: 0;
         }
+
+        /* =========================================================
+           ECO RUTA - GLASSMORPHISM MODAL & DIALOG SYSTEM
+           ========================================================= */
+        .glass-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 15, 10, 0.78);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s;
+        }
+        .glass-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .glass-modal {
+            background: rgba(14, 38, 28, 0.88);
+            background-image: radial-gradient(circle at 50% 0%, rgba(63, 168, 125, 0.28) 0%, rgba(6, 23, 16, 0.92) 85%);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
+            border: 1px solid rgba(125, 255, 196, 0.25);
+            border-radius: 24px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 45px rgba(63, 168, 125, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            max-width: 560px;
+            width: 100%;
+            color: #f8fafc;
+            transform: scale(0.92) translateY(14px);
+            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .glass-overlay.active .glass-modal {
+            transform: scale(1) translateY(0);
+        }
+        .glass-modal-header {
+            padding: 22px 28px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(125, 255, 196, 0.12);
+        }
+        .glass-modal-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .glass-modal-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+            background: rgba(63, 168, 125, 0.18);
+            color: #7dffc4;
+            border: 1px solid rgba(125, 255, 196, 0.3);
+            box-shadow: 0 0 16px rgba(63, 168, 125, 0.3);
+        }
+        .glass-modal-icon.icon-warning {
+            background: rgba(245, 158, 11, 0.18);
+            color: #fbbf24;
+            border-color: rgba(245, 158, 11, 0.35);
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.3);
+        }
+        .glass-modal-icon.icon-error {
+            background: rgba(239, 68, 68, 0.18);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.35);
+            box-shadow: 0 0 16px rgba(239, 68, 68, 0.3);
+        }
+        .glass-modal-icon.icon-info {
+            background: rgba(59, 130, 246, 0.18);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.35);
+            box-shadow: 0 0 16px rgba(59, 130, 246, 0.3);
+        }
+        .glass-modal-title {
+            font-size: 19px;
+            font-weight: 700;
+            color: #f8fafc;
+            margin: 0;
+            line-height: 1.25;
+        }
+        .glass-modal-subtitle {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 3px;
+        }
+        .glass-modal-close {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #94a3b8;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 16px;
+        }
+        .glass-modal-close:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            transform: scale(1.05);
+        }
+        .glass-modal-body {
+            padding: 22px 28px;
+            overflow-y: auto;
+            max-height: 70vh;
+            color: #cbd5e1;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .glass-modal-footer {
+            padding: 16px 28px 22px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            border-top: 1px solid rgba(125, 255, 196, 0.1);
+            background: rgba(6, 23, 16, 0.4);
+        }
+        .glass-field-group {
+            margin-bottom: 18px;
+        }
+        .glass-field-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #7dffc4;
+            margin-bottom: 7px;
+        }
+        .glass-input, .glass-select, .glass-textarea {
+            width: 100%;
+            background: rgba(7, 26, 19, 0.75);
+            border: 1px solid rgba(125, 255, 196, 0.25);
+            border-radius: 10px;
+            padding: 11px 14px;
+            color: #ffffff;
+            font-size: 14px;
+            font-family: inherit;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+        .glass-select {
+            color-scheme: dark;
+        }
+        .glass-input:focus, .glass-select:focus, .glass-textarea:focus {
+            border-color: #3fa87d;
+            box-shadow: 0 0 0 3px rgba(63, 168, 125, 0.28), 0 0 15px rgba(63, 168, 125, 0.2);
+            background: rgba(10, 32, 24, 0.85);
+        }
+        .glass-select option, .glass-select optgroup {
+            background-color: #0b2319 !important;
+            color: #f8fafc !important;
+            padding: 10px 14px;
+        }
+        .glass-select option:checked {
+            background-color: #237a46 !important;
+            color: #ffffff !important;
+        }
+        .glass-btn-cancel {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            color: #cbd5e1;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 500;
+            font-size: 13.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .glass-btn-cancel:hover {
+            background: rgba(255, 255, 255, 0.16);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+        .glass-btn-confirm {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: 1px solid rgba(125, 255, 196, 0.4);
+            color: #ffffff;
+            padding: 10px 22px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 13.5px;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .glass-btn-confirm:hover {
+            background: linear-gradient(135deg, #12ca8e 0%, #047857 100%);
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5);
+            transform: translateY(-1px);
+        }
+        .glass-info-pill {
+            background: rgba(63, 168, 125, 0.12);
+            border: 1px solid rgba(125, 255, 196, 0.2);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #cbd5e1;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 
@@ -845,6 +1147,7 @@
             <div class="header-actions">
                 <button class="btn-glass" onclick="window.location.href='estadisticas.html'"><i class="fas fa-chart-bar"></i> Estadísticas</button>
                 <button class="btn-glass" onclick="togglePanelDenuncias()"><i class="fas fa-exclamation-triangle"></i> Denuncias</button>
+                <button class="btn-glass" onclick="window.location.href='chofer.html'"><i class="fas fa-truck"></i> Vista Chofer</button>
                 <button class="btn-glass" onclick="abrirModalKml()"><i class="fas fa-upload"></i> Importar / KML</button>
                 <button class="btn-glass" onclick="exportarKml()"><i class="fas fa-download"></i> Exportar / KML</button>
                 <button class="btn-glass" onclick="toggleConfig()"><i class="fas fa-cog"></i> Configuración</button>
@@ -1085,14 +1388,14 @@
 
             <!-- Panel Choferes -->
             <div id="panelGestionChoferes">
-                <form id="formChofer" onsubmit="guardarChofer(event)" style="display:flex; gap:10px; align-items:flex-end; margin-bottom:20px; background:rgba(0,0,0,0.02); padding:15px; border-radius:15px;">
+                <form id="formChofer" onsubmit="guardarChofer(event)" style="display:flex; gap:10px; align-items:flex-end; margin-bottom:14px; background:rgba(0,0,0,0.02); padding:12px 14px; border-radius:14px;">
                     <input type="hidden" id="choferId">
                     <div style="flex:1;"><label style="font-size:12px; font-weight:600;">Nombre y Apellido</label><input type="text" id="choferNombre" class="control-input" required></div>
                     <div style="flex:1;"><label style="font-size:12px; font-weight:600;">Teléfono/Celular</label><input type="text" id="choferTelefono" class="control-input"></div>
-                    <button type="submit" class="btn-primary" style="padding:12px 20px;"><i class="fas fa-save"></i> Guardar</button>
-                    <button type="button" class="btn-secondary-outline" onclick="resetFormChofer()" style="padding:12px;"><i class="fas fa-eraser"></i></button>
+                    <button type="submit" class="btn-primary" style="padding:10px 18px;"><i class="fas fa-save"></i> Guardar</button>
+                    <button type="button" class="btn-secondary-outline" onclick="resetFormChofer()" style="padding:10px 14px;" title="Limpiar"><i class="fas fa-eraser"></i></button>
                 </form>
-                <div class="table-wrapper" style="max-height:300px;">
+                <div class="table-wrapper" style="max-height:240px;">
                     <table class="client-table">
                         <thead><tr><th>Nombre</th><th>Teléfono</th><th style="width:100px;">Acciones</th></tr></thead>
                         <tbody id="tbodyChoferes"><tr><td colspan="3">Cargando...</td></tr></tbody>
@@ -1102,15 +1405,15 @@
 
             <!-- Panel Vehículos -->
             <div id="panelGestionVehiculos" style="display:none;">
-                <form id="formVehiculo" onsubmit="guardarVehiculo(event)" style="display:flex; gap:10px; align-items:flex-end; margin-bottom:20px; background:rgba(0,0,0,0.02); padding:15px; border-radius:15px;">
+                <form id="formVehiculo" onsubmit="guardarVehiculo(event)" style="display:flex; gap:10px; align-items:flex-end; margin-bottom:14px; background:rgba(0,0,0,0.02); padding:12px 14px; border-radius:14px;">
                     <input type="hidden" id="vehiculoId">
                     <div style="flex:1;"><label style="font-size:12px; font-weight:600;">Modelo/Marca</label><input type="text" id="vehiculoNombre" class="control-input" required></div>
                     <div style="flex:1;"><label style="font-size:12px; font-weight:600;">Chapa/Patente</label><input type="text" id="vehiculoChapa" class="control-input"></div>
                     <div style="flex:1;"><label style="font-size:12px; font-weight:600;">Tipo de Vehículo</label><select id="vehiculoTipo" class="control-input"><option value="camion mediano">Camión Mediano</option><option value="grande">Grande</option><option value="motocarga">Motocarga</option><option value="personal">Personal</option></select></div>
-                    <button type="submit" class="btn-primary" style="padding:12px 20px;"><i class="fas fa-save"></i> Guardar</button>
-                    <button type="button" class="btn-secondary-outline" onclick="resetFormVehiculo()" style="padding:12px;"><i class="fas fa-eraser"></i></button>
+                    <button type="submit" class="btn-primary" style="padding:10px 18px;"><i class="fas fa-save"></i> Guardar</button>
+                    <button type="button" class="btn-secondary-outline" onclick="resetFormVehiculo()" style="padding:10px 14px;" title="Limpiar"><i class="fas fa-eraser"></i></button>
                 </form>
-                <div class="table-wrapper" style="max-height:300px;">
+                <div class="table-wrapper" style="max-height:240px;">
                     <table class="client-table">
                         <thead><tr><th>Vehículo</th><th>Chapa</th><th>Tipo</th><th style="width:100px;">Acciones</th></tr></thead>
                         <tbody id="tbodyVehiculos"><tr><td colspan="4">Cargando...</td></tr></tbody>
@@ -1344,12 +1647,167 @@
         let kmzPlacemarks = [];
         let categorias = [];
 
+        // =========================================================
+        // ECO RUTA - SISTEMA DE VENTANAS EMERGENTES GLASSMORPHISM
+        // =========================================================
+        function ensureGlassOverlay() {
+            let overlay = document.getElementById('globalGlassOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'globalGlassOverlay';
+                overlay.className = 'glass-overlay';
+                document.body.appendChild(overlay);
+            }
+            return overlay;
+        }
+
+        function showGlassModal({ title, subtitle, icon, iconType = 'info', contentHtml, confirmText = 'Aceptar', cancelText = 'Cancelar', showCancel = false, onConfirm = null, onCancel = null, width = '540px' }) {
+            return new Promise((resolve) => {
+                const overlay = ensureGlassOverlay();
+                const iconClass = icon || (iconType === 'error' ? 'fa-exclamation-circle' : (iconType === 'warning' ? 'fa-exclamation-triangle' : (iconType === 'success' ? 'fa-check-circle' : 'fa-info-circle')));
+                const typeClass = iconType === 'error' ? 'icon-error' : (iconType === 'warning' ? 'icon-warning' : (iconType === 'success' ? '' : 'icon-info'));
+
+                overlay.innerHTML = `
+                    <div class="glass-modal" style="max-width:${width};">
+                        <div class="glass-modal-header">
+                            <div class="glass-modal-title-wrap">
+                                <div class="glass-modal-icon ${typeClass}">
+                                    <i class="fas ${iconClass}"></i>
+                                </div>
+                                <div>
+                                    <h3 class="glass-modal-title">${title}</h3>
+                                    ${subtitle ? `<div class="glass-modal-subtitle">${subtitle}</div>` : ''}
+                                </div>
+                            </div>
+                            <button class="glass-modal-close" id="btnGlassClose" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="glass-modal-body">
+                            ${contentHtml}
+                        </div>
+                        <div class="glass-modal-footer">
+                            ${showCancel ? `<button class="glass-btn-cancel" id="btnGlassCancel">${cancelText}</button>` : ''}
+                            <button class="glass-btn-confirm" id="btnGlassConfirm"><span>${confirmText}</span></button>
+                        </div>
+                    </div>
+                `;
+
+                overlay.classList.add('active');
+
+                const closeWith = (val) => {
+                    overlay.classList.remove('active');
+                    setTimeout(() => { overlay.innerHTML = ''; }, 260);
+                    resolve(val);
+                };
+
+                const confirmBtn = document.getElementById('btnGlassConfirm');
+                const cancelBtn = document.getElementById('btnGlassCancel');
+                const closeBtn = document.getElementById('btnGlassClose');
+
+                if (closeBtn) closeBtn.onclick = () => { if (onCancel) onCancel(); closeWith(null); };
+                if (cancelBtn) cancelBtn.onclick = () => { if (onCancel) onCancel(); closeWith(null); };
+
+                if (confirmBtn) {
+                    confirmBtn.onclick = async () => {
+                        let res = true;
+                        if (onConfirm) {
+                            try {
+                                res = await onConfirm();
+                                if (res === false) return; // Validación falló, no cerrar
+                            } catch (err) {
+                                console.error(err);
+                                return;
+                            }
+                        }
+                        closeWith(res !== undefined ? res : true);
+                    };
+                }
+
+                overlay.onclick = (e) => {
+                    if (e.target === overlay) {
+                        if (showCancel) { if (onCancel) onCancel(); closeWith(null); }
+                        else closeWith(true);
+                    }
+                };
+            });
+        }
+
+        function showGlassAlert(message, title = 'Notificación', type = 'info') {
+            const formatted = String(message).replace(/\n/g, '<br>');
+            return showGlassModal({
+                title: title,
+                iconType: type,
+                contentHtml: `<div style="font-size:14.5px; line-height:1.6; color:#e2e8f0;">${formatted}</div>`,
+                confirmText: 'Entendido',
+                showCancel: false
+            });
+        }
+
+        function showGlassConfirm(message, title = 'Confirmar acción', confirmText = 'Confirmar', cancelText = 'Cancelar') {
+            const formatted = String(message).replace(/\n/g, '<br>');
+            return new Promise((resolve) => {
+                showGlassModal({
+                    title: title,
+                    iconType: 'warning',
+                    contentHtml: `<div style="font-size:14.5px; line-height:1.6; color:#e2e8f0;">${formatted}</div>`,
+                    confirmText: confirmText,
+                    cancelText: cancelText,
+                    showCancel: true,
+                    onConfirm: () => resolve(true),
+                    onCancel: () => resolve(false)
+                });
+            });
+        }
+
+        function showGlassPrompt(message, defaultValue = '', title = 'Ingresar datos', placeholder = '', inputType = 'text') {
+            return new Promise((resolve) => {
+                let inputHtml = `
+                    <div style="font-size:14px; margin-bottom:12px; color:#cbd5e1;">${String(message).replace(/\n/g, '<br>')}</div>
+                    <div class="glass-field-group">
+                        <input type="${inputType}" id="glassPromptInput" class="glass-input" value="${escapeHtml(defaultValue)}" placeholder="${escapeHtml(placeholder)}" autofocus>
+                    </div>
+                `;
+                showGlassModal({
+                    title: title,
+                    iconType: 'info',
+                    contentHtml: inputHtml,
+                    confirmText: 'Aceptar',
+                    cancelText: 'Cancelar',
+                    showCancel: true,
+                    onConfirm: () => {
+                        const input = document.getElementById('glassPromptInput');
+                        return input ? input.value : '';
+                    },
+                    onCancel: () => resolve(null)
+                }).then(val => {
+                    if (val !== undefined) resolve(val);
+                });
+                setTimeout(() => {
+                    const inp = document.getElementById('glassPromptInput');
+                    if (inp) {
+                        inp.focus();
+                        inp.select();
+                        inp.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter') document.getElementById('btnGlassConfirm')?.click();
+                        });
+                    }
+                }, 80);
+            });
+        }
+
+        // Interceptar alert global para que utilice la ventana glassmórfica
+        window.alert = function(msg) {
+            showGlassAlert(msg);
+        };
+
         async function fetchWithAuth(url, options = {}) {
             const token = localStorage.getItem('ecoruta_token') || localStorage.getItem('nexo_token');
             if (!options.headers) options.headers = {};
             options.headers['Authorization'] = `Bearer ${token}`;
             const response = await fetch(url, options);
-            if (response.status === 401) { alert("Sesión expirada"); window.location.href = 'login1.html'; }
+            if (response.status === 401) {
+                showGlassAlert("Tu sesión ha expirado. Por favor inicia sesión nuevamente.", "Sesión Expirada", "warning")
+                    .then(() => { window.location.href = 'login1.html'; });
+            }
             return response;
         }
 
@@ -1381,8 +1839,16 @@
                 tbody.innerHTML = data.map(d => {
                     const desc = (d.descripcion || '').replace(/</g, '&lt;').slice(0, 90);
                     const bar = (d.barrio || '').replace(/</g, '&lt;');
+
+                    let asignadoHtml = '';
+                    if (d.cuadrilla || d.asignado_a) {
+                        asignadoHtml = `<br><span style="font-size:11px;font-weight:600;color:#10b981;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.25);padding:2px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-top:4px;"><i class="fas fa-users-cog"></i> ${escapeHtml(d.cuadrilla || d.asignado_a)}</span>`;
+                    } else if (d.chofer_id) {
+                        asignadoHtml = `<br><span style="font-size:11px;font-weight:600;color:#10b981;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.25);padding:2px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-top:4px;"><i class="fas fa-user-check"></i> Chofer #${d.chofer_id}</span>`;
+                    }
+
                     return `<tr>
-                        <td><b>${d.ticket}</b><br><span style="font-size:11px;color:var(--text-muted-light);">${d.categoria || ''}</span></td>
+                        <td><b>${d.ticket}</b><br><span style="font-size:11px;color:var(--text-muted-light);">${d.categoria || ''}</span>${asignadoHtml}</td>
                         <td>${bar}${d.ruta_token ? `<br><span style="font-size:11px;">🚚 ${d.ruta_token}</span>` : ''}</td>
                         <td style="font-size:12px;">${desc}</td>
                         <td>${badgeEstadoDen(d.estado)}</td>
@@ -1390,7 +1856,7 @@
                             ${d.estado === 'pendiente' ? `<button class="btn-secondary-outline" style="font-size:11px;padding:6px 10px;" onclick="accionDenuncia(${d.id},'en_proceso')">▶ En proceso</button>` : ''}
                             ${d.estado !== 'cerrada' ? `<button class="btn-secondary-outline" style="font-size:11px;padding:6px 10px;" onclick="accionDenuncia(${d.id},'cerrada')">✔ Cerrar</button>` : ''}
                             ${d.estado === 'pendiente' || d.estado === 'en_proceso' ? `<button class="btn-secondary-outline" style="font-size:11px;padding:6px 10px;" onclick="accionDenuncia(${d.id},'rechazada')">✖ Rechazar</button>` : ''}
-                            ${!d.cliente_id ? `<button class="btn-primary" style="font-size:11px;padding:6px 10px;" onclick='crearClienteDesdeDenuncia(${JSON.stringify(d).replace(/'/g, "&#39;")})'>＋ Punto de ruta</button>` : `<span style="font-size:11px;">📍 cliente #${d.cliente_id}</span>`}
+                            ${!d.cliente_id ? `<button class="btn-primary" style="font-size:11px;padding:6px 10px;" onclick='abrirModalAsignarPunto(${JSON.stringify(d).replace(/'/g, "&#39;")})'><i class="fas fa-map-marker-alt"></i> ＋ Punto de ruta</button>` : `<span style="font-size:11px;font-weight:600;color:var(--text-muted-light);"><i class="fas fa-check-circle" style="color:#10b981;"></i> Punto #${d.cliente_id}</span>`}
                         </div></td>
                     </tr>`;
                 }).join('');
@@ -1398,24 +1864,214 @@
                 tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">Error cargando denuncias.</td></tr>';
             }
         }
+
         async function accionDenuncia(id, estado) {
-            const obs = estado === 'cerrada' || estado === 'rechazada' ? (prompt('Observación (opcional):') || '') : '';
+            let obs = '';
+            if (estado === 'cerrada' || estado === 'rechazada') {
+                obs = await showGlassPrompt(
+                    'Ingrese una observación para ' + (estado === 'cerrada' ? 'cerrar' : 'rechazar') + ' la denuncia (opcional):',
+                    '',
+                    (estado === 'cerrada' ? 'Cerrar Denuncia' : 'Rechazar Denuncia'),
+                    'Observación opcional...'
+                );
+                if (obs === null) return;
+            }
             const res = await fetchWithAuth('/api/denuncias', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, estado, observacion_cierre: obs }) });
-            if (!res.ok) { const t = await res.text(); alert('No se pudo actualizar: ' + t); return; }
+            if (!res.ok) { const t = await res.text(); showGlassAlert('No se pudo actualizar: ' + t, 'Error al actualizar', 'error'); return; }
+            showGlassAlert('Denuncia actualizada a estado: ' + estado, 'Estado Actualizado', 'success');
             cargarDenuncias();
         }
-        async function crearClienteDesdeDenuncia(d) {
-            const nombre = prompt('Nombre del punto de ruta:', 'Denuncia ' + d.ticket + ' - ' + d.barrio);
-            if (!nombre) return;
-            const res = await fetchWithAuth('/api/clientes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre, tipo_cliente: 'denuncia', latitud: d.latitud, longitud: d.longitud, ciudad: d.barrio, cadena: d.barrio }) });
-            if (!res.ok) { alert('No se pudo crear el punto de ruta'); return; }
-            const cli = await res.json();
-            const clienteId = cli.id || (cli.cliente && cli.cliente.id);
-            if (!clienteId) { alert('Punto creado, recarga clientes'); if (typeof cargarClientes === 'function') cargarClientes(); return; }
-            await fetchWithAuth('/api/denuncias', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id, estado: 'en_proceso', cliente_id: clienteId, observacion_cierre: 'Punto de ruta #' + clienteId + ' creado por gestor' }) });
-            alert('Punto #' + clienteId + ' creado y denuncia en proceso. Inclúyelo al generar la ruta del barrio.');
-            if (typeof cargarClientes === 'function') cargarClientes();
-            cargarDenuncias();
+
+        function toggleCustomCuadrilla(val) {
+            const wrap = document.getElementById('gmCustomCuadrillaWrap');
+            if (!wrap) return;
+            wrap.style.display = val === 'custom' ? 'block' : 'none';
+            if (val === 'custom') {
+                document.getElementById('gmCustomCuadrilla')?.focus();
+            }
+        }
+
+        async function abrirModalAsignarPunto(d) {
+            let choferesList = [];
+            let vehiculosList = [];
+            try {
+                const [resCh, resVh] = await Promise.all([
+                    fetchWithAuth('/api/choferes'),
+                    fetchWithAuth('/api/vehiculos')
+                ]);
+                if (resCh.ok) choferesList = await resCh.json();
+                if (resVh.ok) vehiculosList = await resVh.json();
+            } catch (e) {
+                console.warn('Error al cargar choferes o vehículos:', e);
+            }
+
+            const defaultNombre = 'Denuncia ' + d.ticket + ' - ' + d.barrio;
+            
+            const contentHtml = `
+                <div class="glass-field-group">
+                    <label class="glass-field-label"><i class="fas fa-tag"></i> Nombre del Punto de Recolección</label>
+                    <input type="text" id="gmPuntoNombre" class="glass-input" value="${escapeHtml(defaultNombre)}" placeholder="Ej: Denuncia ECO-... - Barrio">
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Se registrará en la ruta y mapa diferenciado como <b>🚨 Denuncia Asignada</b>.</div>
+                </div>
+
+                <div class="glass-field-group">
+                    <label class="glass-field-label"><i class="fas fa-user-check"></i> Asignar al Chofer (Recorrido de Recolección)</label>
+                    <select id="gmPuntoChofer" class="glass-select" onchange="actualizarInfoAsignacionChofer(this.value)">
+                        <option value="">-- Seleccionar Chofer Responsable --</option>
+                        ${choferesList.map(c => {
+                            const tieneRuta = !!c.ruta_activa_token;
+                            const tag = tieneRuta 
+                                ? `[🟢 Ruta Activa · Móvil ${c.ruta_activa_movil} (${c.ruta_activa_paradas} paradas)]`
+                                : `[⚪ Sin ruta activa · Se creará ruta]`;
+                            return `<option value="${c.id}" data-tiene-ruta="${tieneRuta ? '1' : '0'}" data-paradas="${c.ruta_activa_paradas || 0}" data-movil="${c.ruta_activa_movil || ''}" data-vehiculo="${escapeHtml(c.ruta_activa_vehiculo || '')}" data-nombre="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)} ${tag}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
+
+                <div id="gmInfoAsignacionBox" style="margin-bottom:14px; padding:12px; border-radius:12px; font-size:12px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); color:#6ee7b7; display:none;">
+                    <!-- Se llena dinámicamente -->
+                </div>
+
+                <div class="glass-field-group" id="gmVehiculoWrap" style="display:none;">
+                    <label class="glass-field-label"><i class="fas fa-truck"></i> Vehículo / Móvil Asignado</label>
+                    <select id="gmPuntoVehiculo" class="glass-select">
+                        <option value="">-- Seleccionar Vehículo (Opcional) --</option>
+                        ${vehiculosList.map(v => `<option value="${v.id}">${escapeHtml(v.nombre)} (${escapeHtml(v.chapa || '')})</option>`).join('')}
+                    </select>
+                </div>
+
+                <div class="glass-field-group">
+                    <label class="glass-field-label"><i class="fas fa-comment-alt"></i> Observación / Instrucción para el Chofer</label>
+                    <textarea id="gmPuntoObs" class="glass-textarea" rows="2" placeholder="Indicaciones especiales de acceso o prioridad (opcional)..."></textarea>
+                </div>
+
+                <div class="glass-info-pill" style="border-left:4px solid #f59e0b; background:rgba(245,158,11,0.08);">
+                    <i class="fas fa-exclamation-triangle" style="color:#f59e0b; font-size:18px;"></i>
+                    <div>
+                        <b style="color:#fbbf24;">${escapeHtml(d.barrio)}</b> · Ticket <b>${escapeHtml(d.ticket)}</b><br>
+                        <span style="font-size:11px; opacity:0.9;">Cat: ${escapeHtml(d.categoria || 'Incidencia')} · "${escapeHtml((d.descripcion || '').slice(0, 80))}"</span>
+                    </div>
+                </div>
+            `;
+
+            window._tempChoferesList = choferesList;
+
+            showGlassModal({
+                title: 'Asignar Denuncia a Chofer',
+                subtitle: 'Se añadirá como punto de ruta oficial en su recorrido operativo',
+                icon: 'fa-map-pin',
+                iconType: 'success',
+                contentHtml: contentHtml,
+                confirmText: 'Asignar Punto a Ruta',
+                cancelText: 'Cancelar',
+                showCancel: true,
+                width: '620px',
+                onConfirm: async () => {
+                    const nombrePunto = document.getElementById('gmPuntoNombre').value.trim();
+                    if (!nombrePunto) {
+                        showGlassAlert('Por favor ingrese un nombre para el punto de recolección.', 'Campo Requerido', 'warning');
+                        return false;
+                    }
+
+                    const choferSelect = document.getElementById('gmPuntoChofer');
+                    const choferId = parseInt(choferSelect.value);
+                    if (!choferId) {
+                        showGlassAlert('Por favor seleccione un chofer responsable para asignarle este punto.', 'Seleccione Chofer', 'warning');
+                        return false;
+                    }
+
+                    const vehiculoVal = document.getElementById('gmPuntoVehiculo')?.value;
+                    const vehiculoId = vehiculoVal ? parseInt(vehiculoVal) : null;
+                    const obsUser = document.getElementById('gmPuntoObs').value.trim();
+
+                    try {
+                        const res = await fetchWithAuth('/api/denuncias/asignar-punto', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                denuncia_id: d.id,
+                                chofer_id: choferId,
+                                vehiculo_id: vehiculoId,
+                                nombre_punto: nombrePunto,
+                                observacion: obsUser
+                            })
+                        });
+
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            showGlassAlert(err.message || 'Error al asignar el punto a la ruta del chofer.', 'Error en Asignación', 'error');
+                            return false;
+                        }
+
+                        const data = await res.json();
+                        showGlassAlert(
+                            `<b>✅ Punto Asignado Exitosamente</b><br><br>` +
+                            `• <b>Chofer:</b> ${escapeHtml(data.chofer_nombre)}<br>` +
+                            `• <b>Móvil / Vehículo:</b> Móvil #${data.movil_numero} (${escapeHtml(data.vehiculo_nombre || 'Camión asignado')})<br>` +
+                            `• <b>Paradas en recorrido:</b> ${data.total_paradas}<br>` +
+                            `• <b>Tipo de asignación:</b> ${data.es_nueva_ruta ? 'Nueva ruta generada' : 'Parada adicional añadida a su ruta activa'}<br>` +
+                            `• <b>Identificador:</b> <span style="color:#f59e0b; font-weight:700;">🚨 Denuncia Asignada (${d.ticket})</span><br><br>` +
+                            `El chofer ya puede visualizar esta parada en su mapa operativo.`,
+                            'Asignación a Ruta Completada',
+                            'success'
+                        );
+
+                        if (typeof cargarClientes === 'function') cargarClientes();
+                        cargarDenuncias();
+                        return true;
+                    } catch (err) {
+                        console.error('Error en asignar punto:', err);
+                        showGlassAlert('Error de conexión al procesar la asignación.', 'Error', 'error');
+                        return false;
+                    }
+                }
+            });
+        }
+
+        function actualizarInfoAsignacionChofer(choferIdVal) {
+            const box = document.getElementById('gmInfoAsignacionBox');
+            const vWrap = document.getElementById('gmVehiculoWrap');
+            if (!box) return;
+
+            if (!choferIdVal) {
+                box.style.display = 'none';
+                if (vWrap) vWrap.style.display = 'none';
+                return;
+            }
+
+            const sel = document.getElementById('gmPuntoChofer');
+            const opt = sel.options[sel.selectedIndex];
+            const tieneRuta = opt.getAttribute('data-tiene-ruta') === '1';
+            const paradas = parseInt(opt.getAttribute('data-paradas') || '0');
+            const movil = opt.getAttribute('data-movil');
+            const vehiculo = opt.getAttribute('data-vehiculo');
+            const nombre = opt.getAttribute('data-nombre');
+
+            box.style.display = 'block';
+            if (tieneRuta) {
+                box.style.background = 'rgba(16,185,129,0.12)';
+                box.style.borderColor = 'rgba(16,185,129,0.35)';
+                box.style.color = '#7dffc4';
+                box.innerHTML = `
+                    <i class="fas fa-check-circle" style="color:#10b981; margin-right:4px;"></i>
+                    <b>Ruta activa en curso:</b> Esta denuncia se agregará automáticamente como <b>parada #${paradas + 1}</b> al recorrido del <b>Móvil ${movil}</b> (${vehiculo}). El chofer la visualizará de inmediato como punto prioritario de denuncia.
+                `;
+                if (vWrap) vWrap.style.display = 'none';
+            } else {
+                box.style.background = 'rgba(59,130,246,0.12)';
+                box.style.borderColor = 'rgba(59,130,246,0.35)';
+                box.style.color = '#93c5fd';
+                box.innerHTML = `
+                    <i class="fas fa-route" style="color:#3b82f6; margin-right:4px;"></i>
+                    <b>Generar nueva ruta:</b> El chofer no tiene ruta activa en este momento. Se generará una nueva ruta activa oficial con este punto asignado (lógica idéntica a generar rutas).
+                `;
+                if (vWrap) vWrap.style.display = 'block';
+            }
+        }
+
+        // Mantener compatibilidad si se llamaba directo a crearClienteDesdeDenuncia
+        function crearClienteDesdeDenuncia(d) {
+            abrirModalAsignarPunto(d);
         }
 
         async function cargarClientes() {
@@ -1506,8 +2162,8 @@
             if (!c) return; 
             let url = c.url_google || `https://maps.google.com/?q=${c.latitud},${c.longitud}`; 
             navigator.clipboard.writeText(url)
-                .then(() => alert('URL (' + url + ') copiada al portapapeles'))
-                .catch(() => window.prompt('Copia esta URL manualmente:', url)); 
+                .then(() => showGlassAlert('URL copiada al portapapeles:<br><span style="font-size:12px;opacity:0.85;word-break:break-all;">' + url + '</span>', 'Enlace Copiado', 'success'))
+                .catch(() => showGlassPrompt('Copia esta URL manualmente:', url, 'Copiar Enlace')); 
         }
 
         // =================== MODAL AGRUPAR ===================
@@ -1694,7 +2350,7 @@
         // =================== FIN AGRUPAR ===================
 
         async function desagruparGrupo(nombreGrupo) {
-            if (!confirm(`¿Desagrupar el grupo "${nombreGrupo.toUpperCase()}"? Todos los clientes volverán a ser individuales.`)) return;
+            if (!await ecoConfirm(`¿Desagrupar el grupo "${nombreGrupo.toUpperCase()}"? Todos los clientes volverán a ser individuales.`, 'Desagrupar Clientes')) return;
             const clientesGrupo = clientes.filter(c => c.cadena && c.cadena.toLowerCase() === nombreGrupo.toLowerCase());
             for (const c of clientesGrupo) {
                 c.cadena = 'NINGUNO';
@@ -1844,7 +2500,7 @@
                 alert('Error al guardar'); 
             } 
         }
-        async function eliminarCliente(id) { if (confirm('¿Eliminar?')) { await fetchWithAuth(`/api/clientes?id=${id}`, { method: 'DELETE' }); cargarClientes(); } }
+        async function eliminarCliente(id) { if (await ecoConfirm('¿Deseas eliminar este cliente?', 'Eliminar Punto', { danger: true })) { await fetchWithAuth(`/api/clientes?id=${id}`, { method: 'DELETE' }); cargarClientes(); } }
 
         async function generarRutas() {
             if (clientes.filter(c => c.seleccionado).length === 0) return alert("Seleccioná clientes");
@@ -2047,7 +2703,7 @@
             cargarTransportes();
         }
         async function eliminarChofer(id) { 
-            if (confirm('¿Inhabilitar a este chofer? Ya no aparecerá para asignar pero las estadísticas se conservan.')) { 
+            if (await ecoConfirm('¿Inhabilitar a este chofer? Ya no aparecerá para asignar pero las estadísticas se conservan.', 'Inhabilitar Chofer', { danger: true })) { 
                 await fetchWithAuth(`/api/choferes?id=${id}`, { method: 'DELETE' }); 
                 cargarTransportes(); 
             } 
@@ -2073,7 +2729,7 @@
             cargarTransportes();
         }
         async function eliminarVehiculo(id) { 
-            if (confirm('¿Inhabilitar a este vehículo? Ya no aparecerá para asignar pero las estadísticas se conservan.')) { 
+            if (await ecoConfirm('¿Inhabilitar a este vehículo? Ya no aparecerá para asignar pero las estadísticas se conservan.', 'Inhabilitar Vehículo', { danger: true })) { 
                 await fetchWithAuth(`/api/vehiculos?id=${id}`, { method: 'DELETE' }); 
                 cargarTransportes(); 
             } 
@@ -2188,7 +2844,7 @@
         async function eliminarCategoria(id) {
             const cat = categorias.find(c => c.id === id);
             if (!cat) return;
-            if (!confirm(`¿Eliminar la categoría "${cat.nombre}"?`)) return;
+            if (!await ecoConfirm(`¿Eliminar la categoría "${cat.nombre}"?`, 'Eliminar Categoría', { danger: true })) return;
             try {
                 const res = await fetchWithAuth(`/api/categorias?id=${id}`, { method: 'DELETE' });
                 const data = await res.json().catch(() => ({}));
@@ -2291,7 +2947,8 @@ document.getElementById('modalRutas').style.display = 'flex';
         }
 
         async function forzarFinalizarRuta(token) {
-            if (!confirm('¿Estas seguro de que quieres finalizar esta ruta a la fuerza? Esto liberara al chofer para nuevas asignaciones.')) return;
+            const ok = await showGlassConfirm('¿Estás seguro de que quieres finalizar esta ruta? Esto liberará al chofer para nuevas asignaciones.', 'Finalizar Ruta', 'Finalizar Ruta', 'Cancelar');
+            if (!ok) return;
             try {
                 const res = await fetchWithAuth('/api/finalizar-ruta', {
                     method: 'POST',
@@ -2299,10 +2956,10 @@ document.getElementById('modalRutas').style.display = 'flex';
                     body: JSON.stringify({ token: token })
                 });
                 if (!res.ok) throw new Error('Error al finalizar la ruta');
-                alert('✅ Ruta finalizada correctamente. El chofer ha sido liberado.');
+                showGlassAlert('Ruta finalizada correctamente. El chofer ha sido liberado.', 'Operación Exitosa', 'success');
                 cargarTodasLasRutas();
             } catch (error) {
-                alert('❌ ' + error.message);
+                showGlassAlert(error.message, 'Error', 'error');
             }
         }
 
@@ -2318,10 +2975,11 @@ document.getElementById('modalRutas').style.display = 'flex';
 
             let password = null;
             if (requierePassword) {
-                password = prompt('Esta ruta tiene más de 7 días. Ingrese contraseña de administrador para eliminarla:');
+                password = await showGlassPrompt('Esta ruta tiene más de 7 días. Ingrese contraseña de administrador para eliminarla:', '', 'Autorización Requerida', 'Contraseña de administrador...', 'password');
                 if (password === null) return; // Cancelado
             } else {
-                if (!confirm('¿Estás seguro de eliminar esta ruta? Esta acción no se puede deshacer.')) return;
+                const ok = await showGlassConfirm('¿Estás seguro de eliminar esta ruta? Esta acción no se puede deshacer.', 'Eliminar Ruta', 'Eliminar Ruta', 'Cancelar');
+                if (!ok) return;
             }
 
             try {
@@ -2334,10 +2992,10 @@ document.getElementById('modalRutas').style.display = 'flex';
                     if (res.status === 403) throw new Error('Contraseña incorrecta o permisos insuficientes');
                     throw new Error('Error al eliminar ruta');
                 }
-                alert('✅ Ruta eliminada correctamente.');
+                showGlassAlert('Ruta eliminada correctamente.', 'Ruta Eliminada', 'success');
                 cargarTodasLasRutas();
             } catch (error) {
-                alert('❌ ' + error.message);
+                showGlassAlert(error.message, 'Error', 'error');
             }
         }
 

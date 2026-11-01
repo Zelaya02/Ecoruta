@@ -56,10 +56,11 @@ button { font-family: inherit; }
    NAV DESKTOP + DROPDOWNS
    ===================================================== */
 .main-nav { padding: 0 1.5rem 15px; display: flex; justify-content: center; }
-.main-nav ul { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; }
-.main-nav > ul > li { position: relative; }
+.main-nav ul { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; }
+.main-nav > ul > li { position: relative; display: flex; align-items: center; }
 .main-nav > ul > li > a {
-  display: block;
+  display: inline-flex;
+  align-items: center;
   padding: 0.6em 1.2em;
   color: var(--palette5);
   font-size: 17px;
@@ -69,47 +70,275 @@ button { font-family: inherit; }
 }
 .main-nav > ul > li > a:hover { color: var(--palette1); }
 .main-nav > ul > li.current-menu-item > a { color: var(--palette3); }
-/* Botón de acceso al sistema EcoRuta (login por roles) */
+
+/* Botón institucional Acceder (login) */
 .main-nav a.nav-acceso {
-  color: var(--palette1) !important;
-  font-weight: 700;
-  border: 2px solid var(--palette1);
-  border-radius: 4px;
-  padding: 0.4em 1em !important;
-  margin-left: 0.5em;
-  transition: background .2s, color .2s;
+  background: var(--palette1);
+  color: #ffffff !important;
+  font-size: 15px;
+  font-weight: 600;
+  border: 1.5px solid var(--palette1);
+  border-radius: 6px;
+  padding: 0.45em 1.25em !important;
+  margin-left: 0.8em;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 2px 8px rgba(176, 43, 45, 0.25);
+  transition: all .2s ease;
+  letter-spacing: 0.2px;
 }
-.main-nav a.nav-acceso:hover { background: var(--palette1); color: #fff !important; }
-/* Botón del camión reciclador → login EcoRuta */
-.main-nav a.nav-camion {
-  color: #fff !important;
-  font-weight: 700;
-  background: #2e9e5b;
-  border: 2px solid #2e9e5b;
-  border-radius: 4px;
-  padding: 0.4em 1em !important;
-  margin-left: 0.5em;
-  transition: background .2s, transform .2s;
+.main-nav a.nav-acceso:hover {
+  background: var(--palette2);
+  border-color: var(--palette2);
+  color: #ffffff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(145, 34, 36, 0.35);
 }
-.main-nav a.nav-camion:hover { background: #237a46; transform: translateY(-1px); }
+.main-nav a.nav-acceso svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Drawer móvil */
 .drawer-menu a.drawer-acceso {
-  color: #fff !important;
-  font-weight: 700;
-  border: 1px solid var(--palette1);
+  background: var(--palette1);
+  color: #ffffff !important;
+  font-weight: 600;
   border-radius: 6px;
-  margin: 6px 16px;
+  margin: 10px 16px 6px;
+  padding: 0.85em 1.2em;
   text-align: center;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 2px 6px rgba(176, 43, 45, 0.25);
+  transition: background .2s ease;
 }
-.drawer-menu a.drawer-camion {
-  color: #fff !important;
+.drawer-menu a.drawer-acceso:hover {
+  background: var(--palette2);
+}
+.drawer-menu a.drawer-acceso svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+/* =====================================================
+   SECCIÓN DE PRESENTACIÓN: SISTEMA ECORUTA ASUNCIÓN
+   (Diseño 100% integrado al estilo institucional del portal)
+   ===================================================== */
+.ecoruta-presentation {
+  max-width: var(--content-width);
+  margin: 0 auto 50px;
+  padding: 0 1.5rem;
+}
+.ecoruta-card-main {
+  background: #ffffff;
+  border: 1px solid var(--palette7);
+  border-radius: 8px;
+  padding: 2.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+.ecoruta-header-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--palette7);
+  color: var(--palette1);
+  font-size: 13px;
   font-weight: 700;
-  background: #2e9e5b;
-  border: 1px solid #2e9e5b;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+.ecoruta-title {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--palette3);
+  line-height: 1.3;
+  margin-bottom: 12px;
+}
+.ecoruta-lead {
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--palette4);
+  max-width: 1050px;
+  margin-bottom: 30px;
+}
+.ecoruta-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 35px;
+}
+.ecoruta-stat-card {
+  background: var(--palette8);
+  border: 1px solid var(--palette7);
   border-radius: 6px;
-  margin: 6px 16px;
+  padding: 18px 22px;
+  border-left: 4px solid var(--palette1);
+  transition: transform .2s ease;
+}
+.ecoruta-stat-card:hover {
+  transform: translateY(-2px);
+}
+.ecoruta-stat-num {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--palette1);
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+.ecoruta-stat-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--palette3);
+  margin-bottom: 2px;
+}
+.ecoruta-stat-desc {
+  font-size: 12.5px;
+  color: var(--palette5);
+  line-height: 1.4;
+}
+.ecoruta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 35px;
+}
+.ecoruta-feature-card {
+  background: #ffffff;
+  border: 1px solid var(--palette7);
+  border-radius: 6px;
+  padding: 22px 18px;
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  display: flex;
+  flex-direction: column;
+}
+.ecoruta-feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(176, 43, 45, 0.08);
+  border-color: rgba(176, 43, 45, 0.3);
+}
+.ecoruta-feature-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--palette8);
+  border: 1px solid var(--palette7);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  color: var(--palette1);
+}
+.ecoruta-feature-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+}
+.ecoruta-feature-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--palette3);
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+.ecoruta-feature-text {
+  font-size: 14px;
+  color: var(--palette4);
+  line-height: 1.6;
+  flex: 1;
+}
+.ecoruta-actions-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+  padding-top: 25px;
+  border-top: 1px solid var(--palette7);
+}
+.ecoruta-btn-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--palette1);
+  color: #ffffff !important;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 26px;
+  border-radius: 6px;
+  transition: all .2s ease;
+  box-shadow: 0 3px 8px rgba(176, 43, 45, 0.25);
+  text-decoration: none;
+}
+.ecoruta-btn-cta:hover {
+  background: var(--palette2);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(145, 34, 36, 0.35);
+}
+.ecoruta-btn-cta svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+}
+.ecoruta-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  color: var(--palette4) !important;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 11px 22px;
+  border-radius: 6px;
+  border: 1px solid var(--palette6);
+  transition: all .2s ease;
+  text-decoration: none;
+}
+.ecoruta-btn-outline:hover {
+  background: var(--palette8);
+  color: var(--palette1) !important;
+  border-color: var(--palette1);
+}
+@media (max-width: 1024px) {
+  .ecoruta-stats-row { grid-template-columns: repeat(3, 1fr); }
+  .ecoruta-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 767px) {
+  .ecoruta-card-main { padding: 1.5rem; }
+  .ecoruta-title { font-size: 22px; }
+  .ecoruta-stats-row { grid-template-columns: 1fr; }
+  .ecoruta-grid { grid-template-columns: 1fr; }
+}
+  color: var(--palette1) !important;
+  font-weight: 600;
+  border: 1.5px solid var(--palette1);
+  border-radius: 6px;
+  margin: 6px 16px 12px;
+  padding: 0.75em 1.2em;
   text-align: center;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all .2s ease;
+}
+.drawer-menu a.drawer-acceso:hover {
+  background: var(--palette1);
+  color: #ffffff !important;
+}
+.drawer-menu a.drawer-acceso svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
 }
 
 .main-nav > ul > li.has-children > a::after {
@@ -742,10 +971,12 @@ const menuItems = [
       { label: 'Preguntas Frecuentes', href: '#/mas/faq' },
     ],
   },
-  // Acceso al sistema EcoRuta (denuncias + rutas). Se adapta dinámicamente
-  // tanto si se abre por file:// (desarrollo local) como servido en Render o localhost (/login1.html).
-  { label: '🚛 Camión EcoRuta', href: (window.location.protocol === 'file:' ? '../frontend/login1.html' : '/login1.html'), cls: 'nav-camion' },
-  { label: '🔒 Acceder', href: (window.location.protocol === 'file:' ? '../frontend/login1.html' : '/login1.html'), cls: 'nav-acceso' },
+  // Acceso institucional al sistema EcoRuta (login)
+  {
+    label: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>Acceder',
+    href: (window.location.protocol === 'file:' ? '../frontend/login1.html' : '/login1.html'),
+    cls: 'nav-acceso'
+  },
 ];
 
 /* =====================================================
@@ -819,7 +1050,7 @@ function renderDrawerItems(items) {
   return items.map((item) => {
     const hasChildren = item.children && item.children.length;
     if (!hasChildren) {
-      const dCls = item.cls === 'nav-camion' ? 'drawer-camion' : (item.cls === 'nav-acceso' ? 'drawer-acceso' : (item.cls || ''));
+      const dCls = item.cls === 'nav-acceso' ? 'drawer-acceso' : (item.cls || '');
       return `<li><a href="${item.href || '#'}"${dCls ? ` class="${dCls}"` : ''}>${item.label}</a></li>`;
     }
     return `
@@ -937,6 +1168,93 @@ function attachSliderHover() {
 }
 
 /* =====================================================
+   SECCIÓN DE PRESENTACIÓN: SISTEMA ECORUTA
+   ===================================================== */
+function renderEcoRutaPresentation() {
+  const loginUrl = (window.location.protocol === 'file:' ? '../frontend/login1.html' : '/login1.html');
+  const ciudadanoUrl = (window.location.protocol === 'file:' ? '../frontend/ciudadano.html' : '/ciudadano.html');
+
+  return `
+    <h2 class="section-title">EcoRuta · Sistema de Recolección Inteligente</h2>
+    <div class="ecoruta-presentation">
+      <div class="ecoruta-card-main">
+        <div class="ecoruta-header-tag">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+          Dirección de Servicios Urbanos · Gobierno de Asunción
+        </div>
+        <h3 class="ecoruta-title">Modernización y Eficiencia en la Gestión de Residuos Urbanos</h3>
+        <p class="ecoruta-lead">
+          <strong>EcoRuta</strong> es la plataforma tecnológica oficial de la Municipalidad de Asunción diseñada para coordinar de forma inteligente la recolección, optimizar los recorridos de la flota de camiones y ofrecer a los asuncenos un canal ágil y transparente para el reporte y seguimiento de denuncias ambientales.
+        </p>
+
+        <div class="ecoruta-stats-row">
+          <div class="ecoruta-stat-card">
+            <div class="ecoruta-stat-num">68 Barrios</div>
+            <div class="ecoruta-stat-label">Cobertura Integral</div>
+            <div class="ecoruta-stat-desc">Zonificación oficial y cronogramas de recolección en toda la capital.</div>
+          </div>
+          <div class="ecoruta-stat-card">
+            <div class="ecoruta-stat-num">100% Forense</div>
+            <div class="ecoruta-stat-label">Evidencia Genuina</div>
+            <div class="ecoruta-stat-desc">Captura de cámara en vivo con sello de agua indeleble (GPS y timestamp).</div>
+          </div>
+          <div class="ecoruta-stat-card">
+            <div class="ecoruta-stat-num">Ruteo Dinámico</div>
+            <div class="ecoruta-stat-label">Logística Sostenible</div>
+            <div class="ecoruta-stat-desc">Menor tiempo de recorrido y reducción del consumo de combustible.</div>
+          </div>
+        </div>
+
+        <div class="ecoruta-grid">
+          <div class="ecoruta-feature-card">
+            <div class="ecoruta-feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
+            <h4 class="ecoruta-feature-title">Canal Ciudadano en Vivo</h4>
+            <p class="ecoruta-feature-text">Los vecinos reportan vertederos clandestinos y puntos saturados directamente desde su teléfono, con geolocalización satelital y certificación fotográfica instantánea.</p>
+          </div>
+
+          <div class="ecoruta-feature-card">
+            <div class="ecoruta-feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+            </div>
+            <h4 class="ecoruta-feature-title">Optimización de Rutas</h4>
+            <p class="ecoruta-feature-text">Algoritmos inteligentes calculan el trayecto más eficiente para las unidades recolectoras, clasificando residuos según categorías y capacidades de cada camión.</p>
+          </div>
+
+          <div class="ecoruta-feature-card">
+            <div class="ecoruta-feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+            </div>
+            <h4 class="ecoruta-feature-title">Panel de Choferes & Alertas</h4>
+            <p class="ecoruta-feature-text">Navegación asistida en mapa interactivo para las cuadrillas en campo, con actualización de estado de paradas y botón de emergencia ante averías mecánicas.</p>
+          </div>
+
+          <div class="ecoruta-feature-card">
+            <div class="ecoruta-feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            </div>
+            <h4 class="ecoruta-feature-title">Seguimiento & Métricas</h4>
+            <p class="ecoruta-feature-text">Trazabilidad pública con código de ticket para la ciudadanía y tablero de control analítico con indicadores de cumplimiento para las autoridades municipales.</p>
+          </div>
+        </div>
+
+        <div class="ecoruta-actions-row">
+          <a href="${loginUrl}" class="ecoruta-btn-cta">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+            Acceder a la Plataforma
+          </a>
+          <a href="${ciudadanoUrl}" class="ecoruta-btn-outline">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            Portal Ciudadano y Denuncias
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* =====================================================
    VISTAS
    ===================================================== */
 function renderHome() {
@@ -949,6 +1267,7 @@ function renderHome() {
     <div class="noticias-grid" id="noticiasGrid">
       ${noticias.map(n => noticiaCardHTML(n)).join('')}
     </div>
+    ${renderEcoRutaPresentation()}
     <div class="infobox-row">
       <a href="#/servicios/historia-calles" class="infobox">
         <div class="infobox-media">
@@ -975,7 +1294,7 @@ function renderHome() {
         <p>Materiales imprescindibles para conocer el Patrimonio.</p>
       </a>
     </div>
-    <h2 class="section-title">Atención 👀</h2>
+    <h2 class="section-title">Atención al Ciudadano</h2>
     <div class="banner-destacado">
       <img src="img/banner-atencion.jpg" alt="Atención"
            style="max-width:800px;margin:0 auto;"

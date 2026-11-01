@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/glass-dialogs.js"></script>
     <style>
         * {
             margin: 0;
@@ -144,6 +145,35 @@
         .period-select:hover, .date-picker:hover, .btn-glass:hover {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(91, 107, 255, 0.12);
+        }
+
+        .period-select {
+            color-scheme: light;
+        }
+
+        .period-select option {
+            background-color: #ffffff;
+            color: #0d281e;
+            padding: 10px 14px;
+        }
+
+        body.dark-mode .period-select,
+        html.dark-mode .period-select {
+            color-scheme: dark;
+            background-color: #0e261d !important;
+            color: #f2fbf6 !important;
+        }
+
+        body.dark-mode .period-select option,
+        html.dark-mode .period-select option {
+            background-color: #0e261d !important;
+            color: #f2fbf6 !important;
+        }
+
+        body.dark-mode .period-select option:checked,
+        html.dark-mode .period-select option:checked {
+            background-color: #237a46 !important;
+            color: #ffffff !important;
         }
 
         .date-picker { color-scheme: light; }

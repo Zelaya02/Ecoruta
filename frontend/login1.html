@@ -8,6 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="js/glass-dialogs.js"></script>
     <style>
         :root {
             --bg-gradient: linear-gradient(135deg, #0f3d2e 0%, #1a5f4a 50%, #2d8f6f 100%);
@@ -699,7 +701,7 @@
         togglePassword.addEventListener('click', () => {
             const isPassword = passwordInput.type === 'password';
             passwordInput.type = isPassword ? 'text' : 'password';
-            togglePassword.textContent = isPassword ? '🙈' : '👁';
+            togglePassword.innerHTML = isPassword ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
             togglePassword.setAttribute('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
         });
 
@@ -738,8 +740,11 @@
                 localStorage.setItem('nexo_token', data.token);
                 localStorage.setItem('ecoruta_rol', userRol);
                 localStorage.setItem('nexo_rol', userRol);
+                if (data.chofer_id) {
+                    localStorage.setItem('ecoruta_chofer_id', data.chofer_id);
+                }
 
-                btn.textContent = '✓ ¡Bienvenido!';
+                btn.textContent = 'Acceso Concedido';
                 btn.style.background = 'linear-gradient(135deg, #7dffc4 0%, #a8e063 100%)';
                 btn.style.color = '#0f3d2e';
 
@@ -749,6 +754,8 @@
                         window.location.href = 'admin.html';
                     } else if (r === 'ciudadano') {
                         window.location.href = 'ciudadano.html';
+                    } else if (r === 'chofer') {
+                        window.location.href = 'chofer.html';
                     } else {
                         // gestor (rol operativo unificado) -> panel de rutas + denuncias
                         window.location.href = 'index.html';
