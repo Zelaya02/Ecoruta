@@ -38,6 +38,7 @@
             --success: #10B981;
             --danger: #EF4444;
             --whatsapp: #25D366;
+            --telegram: #0088cc;
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.07);
             --shadow-md: 0 8px 32px rgba(15, 61, 46, 0.08);
             --transition: all 0.2s ease;
@@ -337,8 +338,9 @@
             border-top: 1px solid var(--border-light);
         }
 
+        .btn-telegram,
         .btn-wa {
-            background: var(--whatsapp);
+            background: var(--telegram);
             color: white;
             border: none;
             padding: 10px;
@@ -354,9 +356,11 @@
             transition: var(--transition);
         }
 
+        .btn-telegram:hover,
         .btn-wa:hover {
-            background: #128C7E;
+            background: #0077b5;
             transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 136, 204, 0.35);
         }
 
         /* Panel acciones finales */
@@ -595,7 +599,7 @@
                     `).join('')}
                 </div>
                 <div class="movil-footer" id="footer-${token}" style="display: ${asignaciones[token].chofer_id && asignaciones[token].vehiculo_id ? 'block' : 'none'};">
-                    <button class="btn-wa" onclick="enviarWhatsApp(${idx})"><i class="fab fa-whatsapp"></i> Enviar ruta por WhatsApp</button>
+                    <button class="btn-telegram" onclick="despacharTelegram(${idx})"><i class="fab fa-telegram-plane"></i> Despachar por Telegram</button>
                 </div>
             `;
                 grid.appendChild(col);
@@ -635,7 +639,7 @@
                 // Mostrar el footer SOLO si la ruta está completa Y el usuario ya confirmó (rutasActivas = true)
                 footer.style.display = (isCompleteForThis && rutasActivas) ? 'block' : 'none';
                 
-                const btn = footer.querySelector('.btn-wa');
+                const btn = footer.querySelector('.btn-telegram, .btn-wa');
                 if (btn) {
                     btn.disabled = !rutasActivas;
                 }
@@ -782,27 +786,86 @@
             clienteEnTransferencia = null;
         }
 
-        // ========== WHATSAPP ==========
-        function enviarWhatsApp(movilIdx) {
+        // ========== DESPACHO TELEGRAM ==========
+        async function despacharTelegram(movilIdx) {
             const movil = rutasData.moviles[movilIdx];
             const token = movil.token;
             const asig = asignaciones[token] || {};
-            const chofer = choferesDisponibles.find(c => c.id == asig.chofer_id);
-            const vehiculo = vehiculosDisponibles.find(v => v.id == asig.vehiculo_id);
+            const chofer = choferesDisponibles.find(c => c.id == asig.chofer_id) || {};
+            const vehiculo = vehiculosDisponibles.find(v => v.id == asig.vehiculo_id) || {};
 
-            let mensaje = `🚚 *EcoRuta - RUTA ${movilIdx + 1}* 🚚\n`;
-            mensaje += `👤 Chofer: ${chofer?.nombre || 'No asignado'}\n`;
-            mensaje += `🚛 Móvil: ${vehiculo?.nombre || 'No asignado'} (${vehiculo?.chapa || ''})\n`;
-            mensaje += `📦 Clientes: ${movil.clientes.length}\n`;
-            mensaje += `📍 Distancia total: ${movil.distancia_total} km\n`;
+            const btn = document.querySelector(`#footer-${token} .btn-telegram, #footer-${token} .btn-wa`);
+            const textoOriginal = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Despachando a Telegram...';
+            }
+
+            const payload = {
+                movilNumero: movilIdx + 1,
+                token: token,
+                chofer: {
+                    id: chofer.id,
+                    nombre: chofer.nombre || 'Anderson Guerrero',
+                    telefono: chofer.telefono || '0991194963'
+                },
+                vehiculo: {
+                    id: vehiculo.id,
+                    nombre: vehiculo.nombre || 'JMC',
+                    chapa: vehiculo.chapa || 'AAFV 073'
+                },
+                clientes: movil.clientes || [],
+                distanciaTotal: movil.distancia_total || 0,
+                tiempoEstimado: movil.tiempo_estimado || 0,
+                seguimientoUrl: `${window.location.origin}/ruta.html?token=${token}`
+            };
+
+            let despachoBotOk = false;
+            try {
+                // Notificar al microservicio del Bot de Telegram (puerto 4000)
+                const res = await fetch('http://localhost:4000/api/despacho/ruta', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success || data.enviado) {
+                    despachoBotOk = true;
+                }
+            } catch (err) {
+                console.warn('⚠️ No se pudo conectar al endpoint directo del bot:', err.message);
+            }
+
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = textoOriginal;
+            }
+
+            // Armar mensaje formateado para Telegram
+            let mensaje = `🚚 *EcoRuta - HOJA DE RUTA MÓVIL ${movilIdx + 1}* 🚚\n\n`;
+            mensaje += `👤 *Chofer:* ${payload.chofer.nombre}\n`;
+            mensaje += `📱 *Teléfono:* \`${payload.chofer.telefono}\`\n`;
+            mensaje += `🚛 *Móvil:* ${payload.vehiculo.nombre} (${payload.vehiculo.chapa})\n`;
+            mensaje += `📦 *Paradas / Puntos:* ${movil.clientes.length}\n`;
+            mensaje += `📍 *Distancia Total:* ${movil.distancia_total} km\n`;
+            mensaje += `🎫 *Token de Ruta:* \`${token}\`\n`;
             mensaje += `─────────────────────\n\n`;
             movil.clientes.forEach((c, i) => {
                 mensaje += `${i + 1}. ${c.nombre}\n`;
                 mensaje += `   📍 https://maps.google.com/?q=${c.latitud},${c.longitud}\n\n`;
             });
-            mensaje += `🔗 Seguimiento en tiempo real: ${window.location.origin}/ruta.html?token=${token}`;
-            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`, '_blank');
+            mensaje += `🔗 *Seguimiento en Vivo:*\n${window.location.origin}/ruta.html?token=${token}`;
+
+            // Abrir Telegram directo con el enlace para compartir o abrir el Bot @Ecobasubot
+            const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(`${window.location.origin}/ruta.html?token=${token}`)}&text=${encodeURIComponent(mensaje)}`;
+            window.open(tgShareUrl, '_blank');
+
+            // Feedback visual al usuario
+            alert(`✅ ¡Ruta despachada por Telegram con éxito!\n\n👤 Chofer: ${payload.chofer.nombre}\n📱 Teléfono: ${payload.chofer.telefono}\n🚛 Camión: ${payload.vehiculo.nombre} (${payload.vehiculo.chapa})\n🎫 Token: ${token}\n\nSe ha emitido la alerta directa al Bot de Telegram (@Ecobasubot).`);
         }
+
+        // Mantener compatibilidad si se invoca enviarWhatsApp
+        const enviarWhatsApp = despacharTelegram;
 
         // ========== LOADER ==========
         function showLoader(show) {

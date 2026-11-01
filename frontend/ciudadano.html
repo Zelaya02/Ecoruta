@@ -2002,8 +2002,10 @@
         async function submitReport(e) {
             e.preventDefault();
             const submitBtn = document.getElementById('btnSubmitReport');
+            const originalBtnHtml = submitBtn.innerHTML;
             submitBtn.disabled = true;
-            submitBtn.innerHTML = `<span>Registrando...</span>`;
+
+            const fotoVal = document.getElementById('fFoto').value.trim() || null;
 
             const payload = {
                 nombre_ciudadano: document.getElementById('fNombre').value.trim() || storedUser,
@@ -2014,47 +2016,83 @@
                 descripcion: document.getElementById('fDescripcion').value.trim(),
                 latitud: parseFloat(document.getElementById('fLat').value) || -25.2867,
                 longitud: parseFloat(document.getElementById('fLng').value) || -57.6333,
-                foto_url: document.getElementById('fFoto').value.trim() || null
+                foto_url: fotoVal
             };
 
             const authToken = localStorage.getItem('ecoruta_token') || localStorage.getItem('nexo_token') || '';
-            let newTicket = 'ECO-' + Math.floor(100000 + Math.random() * 900000);
+            const agentHost = (window.location.hostname === '127.0.0.1' || !window.location.hostname) ? 'localhost' : window.location.hostname;
+            const agentUrl = `http://${agentHost}:5050/api/denuncias/validar-y-enviar`;
+
+            let realTicket = 'ECO-' + Math.floor(100000 + Math.random() * 900000);
 
             try {
-                const res = await fetch(`${API_BASE}/denuncias`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify(payload)
-                });
+                const headers = { 'Content-Type': 'application/json' };
+                if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
-                if (res.ok) {
-                    const resData = await res.json();
-                    if (resData.ticket) newTicket = resData.ticket;
+                let agentSuccess = false;
+
+                // 1. Intentar validación inteligente mediante Agente IA / Gemini (puerto 5050)
+                try {
+                    submitBtn.innerHTML = `<span>Validando con Agente IA...</span>`;
+                    const agentRes = await fetch(agentUrl, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(payload)
+                    });
+                    if (agentRes.ok) {
+                        const aData = await agentRes.json();
+                        if (aData.success && aData.ticket) {
+                            realTicket = aData.ticket;
+                            agentSuccess = true;
+                        } else if (aData.valido === false) {
+                            throw new Error(`Reporte no aceptado: ${aData.motivo || 'No cumple criterios de validación'}`);
+                        }
+                    }
+                } catch (agentErr) {
+                    if (agentErr.message && agentErr.message.includes('Reporte no aceptado')) {
+                        throw agentErr;
+                    }
+                    console.warn('⚠️ Agente en puerto 5050 no disponible, recurriendo a EcoRuta Backend directo:', agentErr.message);
                 }
+
+                // 2. Si no fue procesado por el agente, enviar directo al Backend EcoRuta
+                if (!agentSuccess) {
+                    submitBtn.innerHTML = `<span>Registrando en base de datos...</span>`;
+                    const res = await fetch(`${API_BASE}/denuncias`, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res.ok) {
+                        const resData = await res.json();
+                        if (resData.ticket) realTicket = resData.ticket;
+                    }
+                }
+
+                payload.id = Date.now();
+                payload.ticket = realTicket;
+                payload.estado = 'PENDIENTE';
+                payload.fecha_creacion = new Date().toISOString();
+                allReports.unshift(payload);
+
+                updateKpis();
+                renderReportsOnMap();
+                renderDrawerList();
+
+                // Show Success State
+                document.getElementById('modalReportFormBody').style.display = 'none';
+                document.getElementById('modalReportSuccessBody').style.display = 'block';
+                document.getElementById('createdTicketCode').textContent = realTicket;
+                submitBtn.style.display = 'none';
+
+                document.getElementById('formReport').reset();
             } catch (err) {
-                console.warn('Backend POST /denuncias unreachable, creating local fallback:', err);
+                console.error('Error al guardar denuncia:', err);
+                alert(err.message || 'Error al procesar la denuncia');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
             }
-
-            payload.id = Date.now();
-            payload.ticket = newTicket;
-            payload.estado = 'PENDIENTE';
-            payload.fecha_creacion = new Date().toISOString();
-            allReports.unshift(payload);
-
-            updateKpis();
-            renderReportsOnMap();
-            renderDrawerList();
-
-            // Show Success State
-            document.getElementById('modalReportFormBody').style.display = 'none';
-            document.getElementById('modalReportSuccessBody').style.display = 'block';
-            document.getElementById('createdTicketCode').textContent = newTicket;
-            submitBtn.style.display = 'none';
-
-            document.getElementById('formReport').reset();
         }
 
         function copyCreatedTicket() {

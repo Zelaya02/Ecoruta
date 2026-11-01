@@ -1,0 +1,28 @@
+{
+  "name": "ecoruta-telegram-bot",
+  "version": "1.0.0",
+  "description": "Microservicio de Bot de Telegram interactivo para despacho de denuncias a conductores de camiones recolectores",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test:dispatch": "node scripts/test-dispatch.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "ecoruta",
+    "recoleccion",
+    "despacho",
+    "telegraf"
+  ],
+  "author": "NEXO EcoRuta Team",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "telegraf": "^4.16.3"
+  }
+}

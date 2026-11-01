@@ -14,3 +14,28 @@ Thumbs.db
 
 # Respaldos de BD (datos sensibles)
 database/dumps/
+
+# Bot Microservice (Telegram)
+bot/node_modules/
+node_modules/
+bot/.env
+**/bot/.env
+
+# AI Agent (Gemini Vision)
+agent/node_modules/
+agent/.env
+**/agent/.env
+agent/uploads/evidencia-*.jpg
+agent/uploads/evidencia-*.png
+agent/uploads/evidencia-*.jpeg
+
+# Flutter Mobile
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.pub-cache/
+mobile/.pub/
+mobile/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties

@@ -236,6 +236,73 @@ cd backend && java -cp "target/classes;lib/*" com.ruteo.Main
 
 ---
 
+---
+
+## 🗑️ DENUNCIAS CIUDADANAS DE RESIDUOS (ECO RUTA)
+
+El sistema permite a los ciudadanos reportar acumulación de basura, vertederos clandestinos, contenedores llenos, residuos voluminosos, restos de poda y animales muertos en vía pública.
+
+### **Flujo de una denuncia:**
+
+1. **El ciudadano reporta** desde el panel ciudadano (foto, descripción, categoría, ubicación)
+2. **El Agente IA valida** (puerto 5050):
+   - ¿Es spam o texto incoherente? → Rechazada
+   - ¿Las coordenadas están en Gran Asunción? → Rechazada si no
+   - ¿Es un duplicado cercano (<150m, últimas 48h)? → Sospechosa (requiere revisión)
+   - ¿La foto muestra residuos? (Gemini Vision, opcional) → Rechazada si no
+3. **Si es válida**, se guarda en la tabla `denuncias` con estado `pendiente` y se genera un ticket `ECO-XXXX`
+4. **El gestor** ve la denuncia en el panel y puede incluirla en una ruta de recolección
+5. **Se despacha al conductor** por Telegram con botones: Aceptar / Rechazar / Ver mapa
+6. **El conductor** acepta → estado `en_proceso` → marca como recolectado → estado `cerrada`
+
+### **Categorías soportadas:**
+| Categoría | Descripción |
+|-----------|-------------|
+| `VERTEDERO_CLANDESTINO` | Montículos de basura arrojados ilegalmente |
+| `CONTENEDOR_LLENO` | Contenedor desbordado en la acera |
+| `RESIDUO_VOLUMINOSO` | Muebles, colchones, electrodomésticos, chatarra |
+| `RESTOS_PODA` | Ramas, troncos, hojas acumulados |
+| `ANIMAL_MUERTO` | Animal muerto que requiere retiro sanitario |
+
+### **Estados de denuncia:**
+| Estado | Significado |
+|--------|-------------|
+| `pendiente` | Creada, esperando ser asignada a ruta |
+| `en_proceso` | Conductor asignado, en camino al punto |
+| `cerrada` | Recolección finalizada |
+| `rechazada` | Descartada por Agente IA o gestor |
+| `requiere_revision` | Sospechosa (duplicado o baja confianza), espera revisión humana |
+
+---
+
+## 🤖 BOT DE TELEGRAM PARA CONDUCTORES
+
+El bot despacha denuncias y rutas a los conductores recolectores mediante Telegram.
+
+### **Comandos del conductor:**
+| Comando | Acción |
+|---------|--------|
+| `/start` | Registrar y vincular al conductor con su zona |
+| `/estado` | Consultar estado operativo del conductor |
+
+### **Botones interactivos en cada alerta:**
+- ✅ **Aceptar Recolección** → Cambia la denuncia a `en_proceso`
+- ❌ **Rechazar** → Cambia la denuncia a `rechazada` (requiere reasignación)
+- 🏁 **Marcar como Recolectado** → Cambia la denuncia a `cerrada`
+- 🗺️ **Ver en Mapa** → Abre Google Maps con las coordenadas
+
+### **Configuración:**
+El token del bot se configura en `bot/.env`:
+```ini
+TELEGRAM_BOT_TOKEN=tu_token_de_BotFather
+TEST_DRIVER_TELEGRAM_ID=8727434553
+DEFAULT_ZONE=Zona Centro
+```
+
+Si no configuras el token, el bot funciona en **modo simulación** (solo imprime en consola).
+
+---
+
 ## 📞 SOPORTE Y CONTACTO
 
 | Canal | Disponibilidad |
